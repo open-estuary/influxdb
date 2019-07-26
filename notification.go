@@ -69,12 +69,14 @@ func (f NotificationRuleFilter) QueryParams() map[string][]string {
 	return qp
 }
 
+// NotificationRuleUpdate is the set of upgrade fields for patch request.
 type NotificationRuleUpdate struct {
 	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Status      *Status `json:"status,omitempty"`
 }
 
+// Valid will verify if the NotificationRuleUpdate is valid.
 func (n *NotificationRuleUpdate) Valid() error {
 	if n.Name != nil && *n.Name == "" {
 		return &Error{
