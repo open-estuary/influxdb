@@ -1,5 +1,5 @@
 // Libraries
-import React, {PureComponent} from 'react'
+import React, {PureComponent, MouseEvent} from 'react'
 import {connect} from 'react-redux'
 
 // Actions
@@ -9,8 +9,14 @@ import {
 } from 'src/authorizations/actions'
 
 // Components
-import {ComponentSize, SlideToggle} from '@influxdata/clockface'
-import {IndexList, ConfirmationButton, Alignment} from 'src/clockface'
+import {
+  ComponentSize,
+  SlideToggle,
+  ComponentColor,
+  IndexList,
+  Alignment,
+} from '@influxdata/clockface'
+import {ConfirmationButton} from 'src/clockface'
 import EditableName from 'src/shared/components/EditableName'
 
 // Types
@@ -37,17 +43,18 @@ class TokenRow extends PureComponent<Props> {
       <IndexList.Row>
         <IndexList.Cell>
           <EditableName
-            onUpdate={this.handleUpdateName}
             name={description}
+            onUpdate={this.handleUpdateName}
             noNameString={DEFAULT_TOKEN_DESCRIPTION}
             onEditName={this.handleClickDescription}
           />
         </IndexList.Cell>
         <IndexList.Cell>
           <SlideToggle
-            active={this.isTokenEnbled}
+            active={this.isTokenEnabled}
             size={ComponentSize.ExtraSmall}
             onChange={this.changeToggle}
+            color={ComponentColor.Success}
           />
         </IndexList.Cell>
         <IndexList.Cell alignment={Alignment.Right} revealOnHover={true}>
@@ -62,7 +69,7 @@ class TokenRow extends PureComponent<Props> {
     )
   }
 
-  private get isTokenEnbled(): boolean {
+  private get isTokenEnabled(): boolean {
     const {auth} = this.props
     return auth.status === AuthorizationUpdateRequest.StatusEnum.Active
   }
@@ -82,8 +89,11 @@ class TokenRow extends PureComponent<Props> {
     this.props.onDelete(id, description)
   }
 
-  private handleClickDescription = () => {
+  private handleClickDescription = (e: MouseEvent<HTMLAnchorElement>) => {
     const {onClickDescription, auth} = this.props
+
+    e.preventDefault()
+
     onClickDescription(auth.id)
   }
 

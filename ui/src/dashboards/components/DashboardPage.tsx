@@ -27,7 +27,6 @@ import {
 
 // Utils
 import {GlobalAutoRefresher} from 'src/utils/AutoRefresher'
-import {createView} from 'src/shared/utils/view'
 import {
   extractRateLimitResourceName,
   extractRateLimitStatus,
@@ -38,7 +37,6 @@ import {
   DASHBOARD_LAYOUT_ROW_HEIGHT,
   AUTOREFRESH_DEFAULT,
 } from 'src/shared/constants'
-import {VEO_TIME_MACHINE_ID} from 'src/timeMachine/constants'
 import {DEFAULT_TIME_RANGE} from 'src/shared/constants/timeRanges'
 
 // Types
@@ -51,9 +49,7 @@ import {
   AppState,
   AutoRefresh,
   AutoRefreshStatus,
-  XYView,
-  ViewType,
-  QueryView,
+  Organization,
 } from 'src/types'
 import {RemoteDataState} from 'src/types'
 import {WithRouterProps} from 'react-router'
@@ -62,7 +58,6 @@ import {Location} from 'history'
 import * as AppActions from 'src/types/actions/app'
 import * as ColorsModels from 'src/types/colors'
 import {toggleShowVariablesControls} from 'src/userSettings/actions'
-import {Organization} from '@influxdata/influx'
 import {LimitStatus} from 'src/cloud/actions/limits'
 
 interface StateProps {
@@ -186,52 +181,52 @@ class DashboardPage extends Component<Props, State> {
     return (
       <Page titleTag={this.pageTitle}>
         <LimitChecker>
-          <AssetLimitAlert
-            resourceName={resourceName}
-            limitStatus={limitStatus}
-          >
-            <HoverTimeProvider>
-              <DashboardHeader
-                org={org}
+          <HoverTimeProvider>
+            <DashboardHeader
+              org={org}
+              dashboard={dashboard}
+              timeRange={timeRange}
+              autoRefresh={autoRefresh}
+              isHidden={inPresentationMode}
+              onAddCell={this.handleAddCell}
+              onAddNote={this.showNoteOverlay}
+              onManualRefresh={onManualRefresh}
+              zoomedTimeRange={zoomedTimeRange}
+              onRenameDashboard={this.handleRenameDashboard}
+              activeDashboard={dashboard ? dashboard.name : ''}
+              handleChooseAutoRefresh={this.handleChooseAutoRefresh}
+              onSetAutoRefreshStatus={this.handleSetAutoRefreshStatus}
+              handleChooseTimeRange={this.handleChooseTimeRange}
+              handleClickPresentationButton={handleClickPresentationButton}
+              toggleVariablesControlBar={onToggleShowVariablesControls}
+              isShowingVariablesControlBar={showVariablesControls}
+            />
+            {showVariablesControls && !!dashboard && (
+              <VariablesControlBar dashboardID={dashboard.id} />
+            )}
+            <AssetLimitAlert
+              resourceName={resourceName}
+              limitStatus={limitStatus}
+              className="dashboard--asset-alert"
+            />
+            {!!dashboard && (
+              <DashboardComponent
+                inView={this.inView}
                 dashboard={dashboard}
                 timeRange={timeRange}
-                autoRefresh={autoRefresh}
-                isHidden={inPresentationMode}
+                manualRefresh={manualRefresh}
+                setScrollTop={this.setScrollTop}
+                onCloneCell={this.handleCloneCell}
+                inPresentationMode={inPresentationMode}
+                onPositionChange={this.handlePositionChange}
+                onDeleteCell={this.handleDeleteDashboardCell}
+                onEditView={this.handleEditView}
                 onAddCell={this.handleAddCell}
-                onAddNote={this.showNoteOverlay}
-                onManualRefresh={onManualRefresh}
-                zoomedTimeRange={zoomedTimeRange}
-                onRenameDashboard={this.handleRenameDashboard}
-                activeDashboard={dashboard ? dashboard.name : ''}
-                handleChooseAutoRefresh={this.handleChooseAutoRefresh}
-                onSetAutoRefreshStatus={this.handleSetAutoRefreshStatus}
-                handleChooseTimeRange={this.handleChooseTimeRange}
-                handleClickPresentationButton={handleClickPresentationButton}
-                toggleVariablesControlBar={onToggleShowVariablesControls}
-                isShowingVariablesControlBar={showVariablesControls}
+                onEditNote={this.showNoteOverlay}
               />
-              {showVariablesControls && !!dashboard && (
-                <VariablesControlBar dashboardID={dashboard.id} />
-              )}
-              {!!dashboard && (
-                <DashboardComponent
-                  inView={this.inView}
-                  dashboard={dashboard}
-                  timeRange={timeRange}
-                  manualRefresh={manualRefresh}
-                  setScrollTop={this.setScrollTop}
-                  onCloneCell={this.handleCloneCell}
-                  inPresentationMode={inPresentationMode}
-                  onPositionChange={this.handlePositionChange}
-                  onDeleteCell={this.handleDeleteDashboardCell}
-                  onEditView={this.handleEditView}
-                  onAddCell={this.handleAddCell}
-                  onEditNote={this.showNoteOverlay}
-                />
-              )}
-              {children}
-            </HoverTimeProvider>
-          </AssetLimitAlert>
+            )}
+            {children}
+          </HoverTimeProvider>
         </LimitChecker>
       </Page>
     )
@@ -299,7 +294,8 @@ class DashboardPage extends Component<Props, State> {
   }
 
   private handleAddCell = async (): Promise<void> => {
-    this.showVEO()
+    const {router, location} = this.props
+    router.push(`${location.pathname}/cells/new`)
   }
 
   private showNoteOverlay = async (id?: string): Promise<void> => {
@@ -311,27 +307,15 @@ class DashboardPage extends Component<Props, State> {
   }
 
   private handleEditView = (cellID: string): void => {
-    this.showVEO(cellID)
-  }
-
-  private showVEO = (id?: string): void => {
-    const {router, location, views, onSetActiveTimeMachine} = this.props
-    if (id) {
-      const view = _.get(views, `${id}.view`) as QueryView
-      onSetActiveTimeMachine(VEO_TIME_MACHINE_ID, {view})
-      router.push(`${location.pathname}/cells/${id}/edit`)
-    } else {
-      const view = createView<XYView>(ViewType.XY)
-      onSetActiveTimeMachine(VEO_TIME_MACHINE_ID, {view})
-      router.push(`${location.pathname}/cells/new`)
-    }
+    const {router, location} = this.props
+    router.push(`${location.pathname}/cells/${cellID}/edit`)
   }
 
   private handleCloneCell = async (cell: Cell): Promise<void> => {
     const {dashboard, onCreateCellWithView, views} = this.props
     const viewEntry = views[cell.id]
     if (viewEntry && viewEntry.view) {
-      await onCreateCellWithView(dashboard, viewEntry.view, cell)
+      await onCreateCellWithView(dashboard.id, viewEntry.view, cell)
     }
   }
 

@@ -11,7 +11,6 @@ import AssetLimitAlert from 'src/cloud/components/AssetLimitAlert'
 import {setActiveTimeMachine} from 'src/timeMachine/actions'
 
 // Utils
-import {DE_TIME_MACHINE_ID} from 'src/timeMachine/constants'
 import {HoverTimeProvider} from 'src/dashboards/utils/hoverTime'
 import {queryBuilderFetcher} from 'src/timeMachine/apis/QueryBuilderFetcher'
 import {
@@ -37,7 +36,7 @@ class DataExplorer extends PureComponent<Props, {}> {
   constructor(props: Props) {
     super(props)
 
-    props.onSetActiveTimeMachine(DE_TIME_MACHINE_ID)
+    props.onSetActiveTimeMachine('de')
     queryBuilderFetcher.clearCache()
   }
 
@@ -45,18 +44,17 @@ class DataExplorer extends PureComponent<Props, {}> {
     const {resourceName, limitStatus} = this.props
 
     return (
-      <div className="data-explorer">
-        <LimitChecker>
-          <AssetLimitAlert
-            resourceName={resourceName}
-            limitStatus={limitStatus}
-          >
-            <HoverTimeProvider>
-              <TimeMachine />
-            </HoverTimeProvider>
-          </AssetLimitAlert>
-        </LimitChecker>
-      </div>
+      <LimitChecker>
+        <AssetLimitAlert
+          resourceName={resourceName}
+          limitStatus={limitStatus}
+        />
+        <div className="data-explorer">
+          <HoverTimeProvider>
+            <TimeMachine />
+          </HoverTimeProvider>
+        </div>
+      </LimitChecker>
     )
   }
 }

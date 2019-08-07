@@ -15,7 +15,7 @@ import {
   ViewType,
   Axes,
   DecimalPlaces,
-  XYViewGeom,
+  XYGeom,
   FieldOption,
   TableOptions,
   TimeMachineTab,
@@ -23,6 +23,7 @@ import {
 } from 'src/types'
 import {Color} from 'src/types/colors'
 import {HistogramPosition} from '@influxdata/giraffe'
+import {TimeMachineID} from 'src/timeMachine/constants'
 
 export type Action =
   | QueryBuilderAction
@@ -72,17 +73,19 @@ export type Action =
   | SetYDomainAction
   | SetXAxisLabelAction
   | SetShadeBelowAction
+  | ReturnType<typeof removeCheck>
+  | ReturnType<typeof addCheck>
 
 interface SetActiveTimeMachineAction {
   type: 'SET_ACTIVE_TIME_MACHINE'
   payload: {
-    activeTimeMachineID: string
+    activeTimeMachineID: TimeMachineID
     initialState: Partial<TimeMachineState>
   }
 }
 
 export const setActiveTimeMachine = (
-  activeTimeMachineID: string,
+  activeTimeMachineID: TimeMachineID,
   initialState: Partial<TimeMachineState> = {}
 ): SetActiveTimeMachineAction => ({
   type: 'SET_ACTIVE_TIME_MACHINE',
@@ -173,10 +176,10 @@ export const setIsViewingRawData = (
 
 interface SetGeomAction {
   type: 'SET_GEOM'
-  payload: {geom: XYViewGeom}
+  payload: {geom: XYGeom}
 }
 
-export const setGeom = (geom: XYViewGeom): SetGeomAction => ({
+export const setGeom = (geom: XYGeom): SetGeomAction => ({
   type: 'SET_GEOM',
   payload: {geom},
 })
@@ -591,4 +594,12 @@ interface SetXAxisLabelAction {
 export const setXAxisLabel = (xAxisLabel: string): SetXAxisLabelAction => ({
   type: 'SET_X_AXIS_LABEL',
   payload: {xAxisLabel},
+})
+
+export const removeCheck = () => ({
+  type: 'REMOVE_CHECK' as 'REMOVE_CHECK',
+})
+
+export const addCheck = () => ({
+  type: 'ADD_CHECK' as 'ADD_CHECK',
 })

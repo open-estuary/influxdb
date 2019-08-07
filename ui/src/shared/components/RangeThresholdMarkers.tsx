@@ -11,12 +11,12 @@ import {isInDomain, clamp} from 'src/shared/utils/vis'
 import {DragEvent} from 'src/shared/utils/useDragBehavior'
 
 // Types
-import {RangeThresholdConfig} from 'src/types'
+import {Threshold} from 'src/types'
 
 interface Props {
   yScale: Scale<number, number>
   yDomain: number[]
-  threshold: RangeThresholdConfig
+  threshold: Threshold
   onChangeMaxPos: (e: DragEvent) => void
   onChangeMinPos: (e: DragEvent) => void
 }
@@ -24,33 +24,33 @@ interface Props {
 const RangeThresholdMarkers: FunctionComponent<Props> = ({
   yScale,
   yDomain,
-  threshold: {level, within, minValue, maxValue},
+  threshold: {level, lowerBound, upperBound},
   onChangeMinPos,
   onChangeMaxPos,
 }) => {
-  const minY = yScale(clamp(minValue, yDomain))
-  const maxY = yScale(clamp(maxValue, yDomain))
+  const minY = yScale(clamp(lowerBound, yDomain))
+  const maxY = yScale(clamp(upperBound, yDomain))
 
   return (
     <>
-      {isInDomain(minValue, yDomain) && (
+      {isInDomain(lowerBound, yDomain) && (
         <ThresholdMarker level={level} y={minY} onDrag={onChangeMinPos} />
       )}
-      {isInDomain(maxValue, yDomain) && (
+      {isInDomain(upperBound, yDomain) && (
         <ThresholdMarker level={level} y={maxY} onDrag={onChangeMaxPos} />
       )}
-      {within ? (
+      {lowerBound > upperBound ? (
         <ThresholdMarkerArea level={level} top={maxY} height={minY - maxY} />
       ) : (
         <>
-          {maxValue <= yDomain[1] && (
+          {upperBound <= yDomain[1] && (
             <ThresholdMarkerArea
               level={level}
               top={yScale(yDomain[1])}
               height={maxY - yScale(yDomain[1])}
             />
           )}
-          {minValue >= yDomain[0] && (
+          {lowerBound >= yDomain[0] && (
             <ThresholdMarkerArea
               level={level}
               top={minY}

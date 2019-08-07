@@ -118,6 +118,14 @@ func (ts *taskServiceValidator) CreateTask(ctx context.Context, t platform.TaskC
 	span, ctx := tracing.StartSpanFromContext(ctx)
 	defer span.Finish()
 
+	if t.Token == "" {
+		return nil, influxdb.ErrMissingToken
+	}
+
+	if t.Type == influxdb.TaskTypeWildcard {
+		return nil, influxdb.ErrInvalidTaskType
+	}
+
 	p, err := platform.NewPermission(platform.WriteAction, platform.TasksResourceType, t.OrganizationID)
 	if err != nil {
 		return nil, err
@@ -155,8 +163,11 @@ func (ts *taskServiceValidator) UpdateTask(ctx context.Context, id platform.ID, 
 		return nil, err
 	}
 
-	if err := ts.validateBucket(ctx, task.Flux, task.OrganizationID, loggerFields...); err != nil {
-		return nil, err
+	// given an update to the task flux definition
+	if upd.Flux != nil {
+		if err := ts.validateBucket(ctx, *upd.Flux, task.OrganizationID, loggerFields...); err != nil {
+			return nil, err
+		}
 	}
 
 	return ts.TaskService.UpdateTask(ctx, id, upd)
@@ -370,10 +381,16 @@ func (ts *taskServiceValidator) validateBucket(ctx context.Context, script strin
 			zap.String("auth_kind", auth.Kind()),
 			zap.String("auth_id", auth.Identifier().String()),
 		)
+
+		// if error is already a platform error then return it
+		if perr, ok := err.(*platform.Error); ok {
+			return perr
+		}
+
 		return platform.NewError(
 			platform.WithErrorErr(err),
-			platform.WithErrorMsg("Failed to authorize."),
-			platform.WithErrorCode(platform.EInvalid))
+			platform.WithErrorMsg("Failed to create task."),
+			platform.WithErrorCode(platform.EUnauthorized))
 	}
 
 	return nil

@@ -1,5 +1,5 @@
 import {Doc} from 'codemirror'
-import {Organization} from '@influxdata/influx'
+import {Organization} from '../../src/types'
 import {
   FROM,
   RANGE,
@@ -127,7 +127,7 @@ describe('DataExplorer', () => {
     })
 
     it('can filter aggregation functions by name from script editor mode', () => {
-      cy.get('.input-field').type('covariance')
+      cy.get('.cf-input-field').type('covariance')
       cy.getByTestID('toolbar-function').should('have.length', 1)
     })
 

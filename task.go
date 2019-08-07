@@ -20,11 +20,14 @@ const (
 
 	TaskStatusActive   = "active"
 	TaskStatusInactive = "inactive"
+
+	TaskTypeWildcard = "*"
 )
 
 // Task is a task. 🎊
 type Task struct {
 	ID              ID     `json:"id"`
+	Type            string `json:"type,omitempty"`
 	OrganizationID  ID     `json:"orgID"`
 	Organization    string `json:"org"`
 	AuthorizationID ID     `json:"authorizationID"`
@@ -60,10 +63,10 @@ type Run struct {
 	ID           ID     `json:"id,omitempty"`
 	TaskID       ID     `json:"taskID"`
 	Status       string `json:"status"`
-	ScheduledFor string `json:"scheduledFor"`
-	StartedAt    string `json:"startedAt,omitempty"`
-	FinishedAt   string `json:"finishedAt,omitempty"`
-	RequestedAt  string `json:"requestedAt,omitempty"`
+	ScheduledFor string `json:"scheduledFor"`          // ScheduledFor is the time the task is scheduled to run at
+	StartedAt    string `json:"startedAt,omitempty"`   // StartedAt is the time the executor begins running the task
+	FinishedAt   string `json:"finishedAt,omitempty"`  // FinishedAt is the time the executor finishes running the task
+	RequestedAt  string `json:"requestedAt,omitempty"` // RequestedAt is the time the coordinator told the scheduler to schedule the task
 	Log          []Log  `json:"log,omitempty"`
 }
 
@@ -134,6 +137,7 @@ type TaskService interface {
 
 // TaskCreate is the set of values to create a task.
 type TaskCreate struct {
+	Type           string `json:"type,omitempty"`
 	Flux           string `json:"flux"`
 	Description    string `json:"description,omitempty"`
 	Status         string `json:"status,omitempty"`
@@ -374,6 +378,7 @@ func (t *TaskUpdate) UpdateFlux(oldFlux string) error {
 
 // TaskFilter represents a set of filters that restrict the returned results
 type TaskFilter struct {
+	Type           *string
 	After          *ID
 	OrganizationID *ID
 	Organization   string

@@ -13,16 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/flux/lang"
 	influxdb "github.com/influxdata/influxdb"
 	platform "github.com/influxdata/influxdb"
-	"github.com/influxdata/influxdb/authorizer"
 	pcontext "github.com/influxdata/influxdb/context"
 	"github.com/influxdata/influxdb/kit/tracing"
 	"github.com/influxdata/influxdb/kv"
-	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/task/backend"
-	"github.com/influxdata/influxdb/task/options"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 )
@@ -288,10 +284,6 @@ func (h *TaskHandler) handleGetTasks(w http.ResponseWriter, r *http.Request) {
 
 	tasks, _, err := h.TaskService.FindTasks(ctx, req.filter)
 	if err != nil {
-		err = &platform.Error{
-			Err: err,
-			Msg: "failed to find tasks",
-		}
 		h.HandleHTTPError(ctx, err, w)
 		return
 	}
@@ -366,117 +358,16 @@ func decodeGetTasksRequest(ctx context.Context, r *http.Request, orgs platform.O
 		req.filter.Limit = platform.TaskDefaultPageSize
 	}
 
+	if ttype := qp.Get("type"); ttype != "" {
+		req.filter.Type = &ttype
+	}
+
 	return req, nil
-}
-
-// createBootstrapTaskAuthorizationIfNotExists checks if a the task create request hasn't specified a token, and if the request came from a session,
-// and if both of those are true, it creates an authorization and return it.
-//
-// Note that the created authorization will have permissions required for the task,
-// but it won't have permissions to read the task, as we don't have the task ID yet.
-//
-// This method may return a nil error and a nil authorization, if there wasn't a need to create an authorization.
-func (h *TaskHandler) createBootstrapTaskAuthorizationIfNotExists(ctx context.Context, a platform.Authorizer, t *platform.TaskCreate) (*platform.Authorization, error) {
-	if t.Token != "" {
-		return nil, nil
-	}
-
-	s, ok := a.(*platform.Session)
-	if !ok {
-		// If an authorization was used continue
-		return nil, nil
-	}
-
-	prog, err := lang.Compile(t.Flux, time.Now())
-	if err != nil {
-		return nil, err
-	}
-
-	preAuthorizer := query.NewPreAuthorizer(h.BucketService)
-	ps, err := preAuthorizer.RequiredPermissions(ctx, prog.Ast, &t.OrganizationID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := authorizer.VerifyPermissions(ctx, ps); err != nil {
-		return nil, err
-	}
-
-	opts, err := options.FromScript(t.Flux)
-	if err != nil {
-		return nil, err
-	}
-
-	auth := &platform.Authorization{
-		OrgID:       t.OrganizationID,
-		UserID:      s.UserID,
-		Permissions: ps,
-		Description: fmt.Sprintf("bootstrap authorization for task %q", opts.Name),
-	}
-
-	if err := h.AuthorizationService.CreateAuthorization(ctx, auth); err != nil {
-		return nil, err
-	}
-
-	t.Token = auth.Token
-
-	return auth, nil
-}
-
-func (h *TaskHandler) finalizeBootstrappedTaskAuthorization(ctx context.Context, bootstrap *platform.Authorization, task *platform.Task) error {
-	// If we created a bootstrapped authorization for a task,
-	// we need to replace it with a new authorization that allows read access on the task.
-	// Unfortunately for this case, updating authorizations is not allowed.
-	readTaskPerm, err := platform.NewPermissionAtID(task.ID, platform.ReadAction, platform.TasksResourceType, bootstrap.OrgID)
-	if err != nil {
-		// We should never fail to create a new permission like this.
-		return err
-	}
-	authzWithTask := &platform.Authorization{
-		UserID:      bootstrap.UserID,
-		OrgID:       bootstrap.OrgID,
-		Permissions: append([]platform.Permission{*readTaskPerm}, bootstrap.Permissions...),
-		Description: fmt.Sprintf("auto-generated authorization for task %q", task.Name),
-	}
-
-	if err := h.AuthorizationService.CreateAuthorization(ctx, authzWithTask); err != nil {
-		h.logger.Warn("Failed to finalize bootstrap authorization", zap.String("taskID", task.ID.String()))
-		// The task exists with an authorization that can't read the task.
-		return err
-	}
-
-	// Assign the new authorization...
-	u, err := h.TaskService.UpdateTask(ctx, task.ID, platform.TaskUpdate{Token: authzWithTask.Token})
-	if err != nil {
-		h.logger.Warn("Failed to assign finalized authorization", zap.String("authorizationID", bootstrap.ID.String()), zap.String("taskID", task.ID.String()))
-		// The task exists with an authorization that can't read the task,
-		// and we've created a new authorization for the task but not assigned it.
-		return err
-	}
-	*task = *u
-
-	// .. and delete the old one.
-	if err := h.AuthorizationService.DeleteAuthorization(ctx, bootstrap.ID); err != nil {
-		// Since this is the last thing we're doing, just log it if we fail to delete for some reason.
-		h.logger.Warn("Failed to delete bootstrap authorization", zap.String("authorizationID", bootstrap.ID.String()), zap.String("taskID", task.ID.String()))
-	}
-
-	return nil
 }
 
 func (h *TaskHandler) handlePostTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	h.logger.Debug("task create request", zap.String("r", fmt.Sprint(r)))
-	auth, err := pcontext.GetAuthorizer(ctx)
-	if err != nil {
-		err = &platform.Error{
-			Err:  err,
-			Code: platform.EUnauthorized,
-			Msg:  "failed to get authorizer",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
 
 	req, err := decodePostTaskRequest(ctx, r)
 	if err != nil {
@@ -507,7 +398,6 @@ func (h *TaskHandler) handlePostTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bootstrapAuthz, err := h.createBootstrapTaskAuthorizationIfNotExists(ctx, auth, &req.TaskCreate)
 	if err != nil {
 		h.HandleHTTPError(ctx, err, w)
 		return
@@ -518,28 +408,20 @@ func (h *TaskHandler) handlePostTask(w http.ResponseWriter, r *http.Request) {
 		if e, ok := err.(AuthzError); ok {
 			h.logger.Error("failed authentication", zap.Errors("error messages", []error{err, e.AuthzError()}))
 		}
-		err = &platform.Error{
-			Err: err,
-			Msg: "failed to create task",
+
+		// if the error is not already a platform error then make it into one
+		if _, ok := err.(*platform.Error); !ok {
+			err = &platform.Error{
+				Err:  err,
+				Code: platform.EInternal,
+				Msg:  "failed to create task",
+			}
 		}
+
 		h.HandleHTTPError(ctx, err, w)
 		return
 	}
 
-	if bootstrapAuthz != nil {
-		// There was a bootstrapped authorization for this task.
-		// Now we need to apply the final authorization for the task.
-		if err := h.finalizeBootstrappedTaskAuthorization(ctx, bootstrapAuthz, task); err != nil {
-			err = &platform.Error{
-				Err:  err,
-				Msg:  fmt.Sprintf("successfully created task with ID %s, but failed to finalize bootstrap token for task", task.ID.String()),
-				Code: platform.EInternal,
-			}
-			h.HandleHTTPError(ctx, err, w)
-			return
-		}
-	}
-	h.logger.Debug("tasks created", zap.String("task", fmt.Sprint(task)))
 	if err := encodeResponse(ctx, w, http.StatusCreated, newTaskResponse(*task, []*platform.Label{})); err != nil {
 		logEncodingError(h.logger, r, err)
 		return
@@ -789,7 +671,7 @@ func (h *TaskHandler) handleGetLogs(w http.ResponseWriter, r *http.Request) {
 
 	if k := auth.Kind(); k != platform.AuthorizationKind {
 		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, req.filter.Task)
+		authz, err := h.getAuthorizationForTask(ctx, auth, req.filter.Task)
 		if err != nil {
 			h.HandleHTTPError(ctx, err, w)
 			return
@@ -881,7 +763,7 @@ func (h *TaskHandler) handleGetRuns(w http.ResponseWriter, r *http.Request) {
 
 	if k := auth.Kind(); k != platform.AuthorizationKind {
 		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, req.filter.Task)
+		authz, err := h.getAuthorizationForTask(ctx, auth, req.filter.Task)
 		if err != nil {
 			h.HandleHTTPError(ctx, err, w)
 			return
@@ -1084,7 +966,7 @@ func (h *TaskHandler) handleGetRun(w http.ResponseWriter, r *http.Request) {
 
 	if k := auth.Kind(); k != platform.AuthorizationKind {
 		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, req.TaskID)
+		authz, err := h.getAuthorizationForTask(ctx, auth, req.TaskID)
 		if err != nil {
 			h.HandleHTTPError(ctx, err, w)
 			return
@@ -1241,7 +1123,7 @@ func (h *TaskHandler) handleRetryRun(w http.ResponseWriter, r *http.Request) {
 
 	if k := auth.Kind(); k != platform.AuthorizationKind {
 		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, req.TaskID)
+		authz, err := h.getAuthorizationForTask(ctx, auth, req.TaskID)
 		if err != nil {
 			h.HandleHTTPError(ctx, err, w)
 			return
@@ -1333,7 +1215,14 @@ func (h *TaskHandler) populateTaskCreateOrg(ctx context.Context, tc *platform.Ta
 // ensuring that the authorizer on ctx is allowed to view the task and the authorization.
 //
 // This method returns a *platform.Error, suitable for directly passing to h.HandleHTTPError.
-func (h *TaskHandler) getAuthorizationForTask(ctx context.Context, taskID platform.ID) (*platform.Authorization, *platform.Error) {
+func (h *TaskHandler) getAuthorizationForTask(ctx context.Context, auth platform.Authorizer, taskID platform.ID) (*platform.Authorization, *platform.Error) {
+	sess, ok := auth.(*platform.Session)
+	if !ok {
+		return nil, &platform.Error{
+			Code: platform.EUnauthorized,
+			Msg:  "unable to authorize session",
+		}
+	}
 	// First look up the task, if we're allowed.
 	// This assumes h.TaskService validates access.
 	t, err := h.TaskService.FindTaskByID(ctx, taskID)
@@ -1345,17 +1234,7 @@ func (h *TaskHandler) getAuthorizationForTask(ctx context.Context, taskID platfo
 		}
 	}
 
-	// Explicitly check against an authorized authorization service.
-	authz, err := authorizer.NewAuthorizationService(h.AuthorizationService).FindAuthorizationByID(ctx, t.AuthorizationID)
-	if err != nil {
-		return nil, &platform.Error{
-			Err:  err,
-			Code: platform.EUnauthorized,
-			Msg:  "unable to access task authorization",
-		}
-	}
-
-	return authz, nil
+	return sess.EphemeralAuth(t.OrganizationID), nil
 }
 
 // TaskService connects to Influx via HTTP using tokens to manage tasks.
@@ -1434,6 +1313,10 @@ func (t TaskService) FindTasks(ctx context.Context, filter platform.TaskFilter) 
 		val.Add("limit", strconv.Itoa(filter.Limit))
 	}
 
+	if filter.Type != nil {
+		val.Add("type", *filter.Type)
+	}
+
 	u.RawQuery = val.Encode()
 
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -1469,6 +1352,10 @@ func (t TaskService) FindTasks(ctx context.Context, filter platform.TaskFilter) 
 func (t TaskService) CreateTask(ctx context.Context, tc platform.TaskCreate) (*platform.Task, error) {
 	span, _ := tracing.StartSpanFromContext(ctx)
 	defer span.Finish()
+
+	if tc.Token == "" {
+		return nil, influxdb.ErrMissingToken
+	}
 
 	u, err := NewURL(t.Addr, tasksPath)
 	if err != nil {
@@ -1774,6 +1661,7 @@ func (t TaskService) RetryRun(ctx context.Context, taskID, runID platform.ID) (*
 	return &rs.Run, nil
 }
 
+// ForceRun starts a run manually right now.
 func (t TaskService) ForceRun(ctx context.Context, taskID platform.ID, scheduledFor int64) (*platform.Run, error) {
 	span, _ := tracing.StartSpanFromContext(ctx)
 	defer span.Finish()
@@ -1825,6 +1713,7 @@ func cancelPath(taskID, runID platform.ID) string {
 	return path.Join(taskID.String(), runID.String())
 }
 
+// CancelRun stops a longer running run.
 func (t TaskService) CancelRun(ctx context.Context, taskID, runID platform.ID) error {
 	span, _ := tracing.StartSpanFromContext(ctx)
 	defer span.Finish()

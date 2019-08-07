@@ -4,8 +4,7 @@ import {withRouter, WithRouterProps} from 'react-router'
 import _ from 'lodash'
 
 // Components
-import {EmptyState} from '@influxdata/clockface'
-import {ResourceList} from 'src/clockface'
+import {EmptyState, ResourceList} from '@influxdata/clockface'
 import AddResourceDropdown from 'src/shared/components/AddResourceDropdown'
 import DashboardCards from 'src/dashboards/components/dashboard_index/DashboardCards'
 
@@ -21,7 +20,7 @@ interface OwnProps {
   onCloneDashboard: (dashboard: Dashboard) => void
   onUpdateDashboard: (dashboard: Dashboard) => void
   onFilterChange: (searchTerm: string) => void
-  filterComponent?: () => JSX.Element
+  filterComponent?: JSX.Element
   onImportDashboard: () => void
   dashboards: Dashboard[]
 }
@@ -116,14 +115,14 @@ class DashboardsTable extends PureComponent<Props, State> {
 
     if (searchTerm) {
       return (
-        <EmptyState size={ComponentSize.Large}>
+        <EmptyState size={ComponentSize.Large} testID="empty-dashboards-list">
           <EmptyState.Text text="No Dashboards match your search term" />
         </EmptyState>
       )
     }
 
     return (
-      <EmptyState size={ComponentSize.Large}>
+      <EmptyState size={ComponentSize.Large} testID="empty-dashboards-list">
         <EmptyState.Text
           text="Looks like you don’t have any Dashboards , why not create one?"
           highlightWords={['Dashboards']}

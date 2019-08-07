@@ -2,10 +2,12 @@ package authorizer_test
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/influxdata/influxdb"
+	platform "github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/authorizer"
 	pctx "github.com/influxdata/influxdb/context"
 	"github.com/influxdata/influxdb/http"
@@ -13,6 +15,7 @@ import (
 	"github.com/influxdata/influxdb/mock"
 	_ "github.com/influxdata/influxdb/query/builtin"
 	"github.com/influxdata/influxdb/task/backend"
+	"github.com/pkg/errors"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -36,6 +39,7 @@ func TestOnboardingValidation(t *testing.T) {
 
 	_, err = ts.CreateTask(ctx, influxdb.TaskCreate{
 		OrganizationID: r.Org.ID,
+		Token:          r.Auth.Token,
 		Flux: `option task = {
  name: "my_task",
  every: 1s,
@@ -113,8 +117,9 @@ from(bucket:"holder") |> range(start:-5m) |> to(bucket:"holder", org:"thing")`,
 
 func TestValidations(t *testing.T) {
 	var (
-		taskID influxdb.ID = 0x7456
-		runID  influxdb.ID = 0x402
+		taskID   = influxdb.ID(0x7456)
+		runID    = influxdb.ID(0x402)
+		otherOrg = &influxdb.Organization{Name: "other_org"}
 	)
 
 	inmem := inmem.NewService()
@@ -129,10 +134,24 @@ func TestValidations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	orgID := r.Org.ID
-	validTaskService := authorizer.NewTaskService(zaptest.NewLogger(t), mockTaskService(orgID, taskID, runID), inmem)
+
+	if err := inmem.CreateOrganization(context.Background(), otherOrg); err != nil {
+		t.Fatal(err)
+	}
+
+	otherBucket := &influxdb.Bucket{
+		Name:  "other_bucket",
+		OrgID: otherOrg.ID,
+	}
+
+	if err = inmem.CreateBucket(context.Background(), otherBucket); err != nil {
+		t.Fatal(err)
+	}
 
 	var (
+		orgID            = r.Org.ID
+		validTaskService = authorizer.NewTaskService(zaptest.NewLogger(t), mockTaskService(orgID, taskID, runID), inmem)
+
 		// Read all tasks in org.
 		orgReadAllTaskPermissions = []influxdb.Permission{
 			{Action: influxdb.ReadAction, Resource: influxdb.Resource{Type: influxdb.TasksResourceType, OrgID: &orgID}},
@@ -197,11 +216,31 @@ from(bucket:"holder") |> range(start:-5m) |> to(bucket:"holder", org:"thing")`,
 			auth: &influxdb.Authorization{},
 		},
 		{
+			name: "create bad type",
+			check: func(ctx context.Context, svc influxdb.TaskService) error {
+				_, err := svc.CreateTask(ctx, influxdb.TaskCreate{
+					OrganizationID: r.Org.ID,
+					Token:          r.Auth.Token,
+					Type:           influxdb.TaskTypeWildcard,
+					Flux: `option task = {
+ name: "my_task",
+ every: 1s,
+}
+from(bucket:"holder") |> range(start:-5m) |> to(bucket:"holder", org:"thing")`,
+				})
+				if err != influxdb.ErrInvalidTaskType {
+					return errors.New("failed to error with invalid task type")
+				}
+				return nil
+			},
+			auth: &influxdb.Authorization{},
+		}, {
 			name: "create success",
 			auth: r.Auth,
 			check: func(ctx context.Context, svc influxdb.TaskService) error {
 				_, err := svc.CreateTask(ctx, influxdb.TaskCreate{
 					OrganizationID: r.Org.ID,
+					Token:          r.Auth.Token,
 					Flux: `option task = {
  name: "my_task",
  every: 1s,
@@ -212,20 +251,97 @@ from(bucket:"holder") |> range(start:-5m) |> to(bucket:"holder", org:"thing")`,
 			},
 		},
 		{
-			name: "create badbucket",
+			name: "create bad bucket",
 			auth: r.Auth,
 			check: func(ctx context.Context, svc influxdb.TaskService) error {
-				_, err := svc.CreateTask(ctx, influxdb.TaskCreate{
-					OrganizationID: r.Org.ID,
-					Flux: `option task = {
+				var (
+					expMsg  = "Failed to create task."
+					expCode = platform.EUnauthorized
+					errfmt  = "expected %q, got %q"
+					_, err  = svc.CreateTask(ctx, influxdb.TaskCreate{
+						OrganizationID: r.Org.ID,
+						Token:          r.Auth.Token,
+						Flux: `option task = {
  name: "my_task",
  every: 1s,
 }
 from(bucket:"bad") |> range(start:-5m) |> to(bucket:"bad", org:"thing")`,
-				})
+					})
+				)
+
 				if err == nil {
 					return errors.New("created task without bucket permission")
 				}
+
+				perr, ok := err.(*influxdb.Error)
+				if !ok {
+					return fmt.Errorf(errfmt, &platform.Error{}, err)
+				}
+
+				if perr.Code != expCode {
+					return fmt.Errorf(errfmt, expCode, perr.Code)
+				}
+
+				if perr.Err == nil {
+					return fmt.Errorf(errfmt, "platform.Error.Err to be present", perr.Err)
+				}
+
+				if !strings.Contains(perr.Err.Error(), "<not found> bucket \"bad\" not found") {
+					return fmt.Errorf(errfmt, "to container bucket not found", perr.Err)
+				}
+
+				if perr.Msg != expMsg {
+					return fmt.Errorf(errfmt, expMsg, perr.Msg)
+				}
+
+				return nil
+			},
+		},
+		{
+			name: "create missing org in to parameters",
+			auth: r.Auth,
+			check: func(ctx context.Context, svc influxdb.TaskService) error {
+				var (
+					expMsg  = "Failed to compile flux script."
+					expErr  = fmt.Errorf("error calling function \"to\": missing required keyword argument \"orgID\"")
+					expCode = platform.EInvalid
+					errfmt  = "expected %q, got %q"
+					_, err  = svc.CreateTask(ctx, influxdb.TaskCreate{
+						OrganizationID: r.Org.ID,
+						Token:          r.Auth.Token,
+						Flux: `option task = {
+ name: "my_task",
+ every: 1s,
+}
+from(bucket:"bad") |> range(start:-5m) |> to(bucket:"bad")`,
+					})
+				)
+
+				if err == nil {
+					return errors.New("created task without bucket permission")
+				}
+
+				perr, ok := err.(*influxdb.Error)
+				if !ok {
+					return fmt.Errorf(errfmt, &platform.Error{}, err)
+				}
+
+				if perr.Code != expCode {
+					return fmt.Errorf(errfmt, expCode, perr.Code)
+				}
+
+				if perr.Err == nil {
+					return fmt.Errorf(errfmt, "platform.Error.Err to be present", perr.Err)
+				}
+
+				if perr.Err.Error() != expErr.Error() {
+					return fmt.Errorf(errfmt, expErr, perr.Err)
+				}
+
+				if perr.Msg != expMsg {
+					return fmt.Errorf(errfmt, expMsg, perr.Msg)
+				}
+
 				return nil
 			},
 		},
@@ -360,6 +476,46 @@ from(bucket:"cows") |> range(start:-5m) |> to(bucket:"cows", org:"thing")`
 				if err == nil {
 					return errors.New("returned no error with unauthorized bucket")
 				}
+				return nil
+			},
+		},
+		{
+			name: "UpdateTask with bad org",
+			auth: &influxdb.Authorization{Status: "active", Permissions: orgWriteAllTaskBucketPermissions},
+			check: func(ctx context.Context, svc influxdb.TaskService) error {
+				var (
+					flux = `option task = {
+ name: "my_task",
+ every: 1s,
+}
+from(bucket:"cows") |> range(start:-5m) |> to(bucket:"other_bucket", org:"other_org")`
+					_, err = svc.UpdateTask(ctx, taskID, influxdb.TaskUpdate{
+						Flux: &flux,
+					})
+				)
+
+				perr, ok := err.(*influxdb.Error)
+				if !ok {
+					return fmt.Errorf("expected platform error, got %q of type %T", err, err)
+				}
+
+				if perr.Code != influxdb.EUnauthorized {
+					return fmt.Errorf(`expected "unauthorized", got %q`, perr.Code)
+				}
+
+				if perr.Msg != "Failed to create task." {
+					return fmt.Errorf(`expected "Failed to authorize.", got %q`, perr.Msg)
+				}
+
+				cerr, ok := errors.Cause(perr.Err).(*platform.Error)
+				if !ok {
+					return fmt.Errorf("expected platform error, got %q of type %T", perr.Err, perr.Err)
+				}
+
+				if cerr.Code != influxdb.ENotFound {
+					return fmt.Errorf(`expected "not found", got %q`, perr.Code)
+				}
+
 				return nil
 			},
 		},

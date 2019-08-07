@@ -36,6 +36,11 @@ var (
 		Msg:  "invalid id",
 	}
 
+	// ErrInvalidTaskType error object for bad id's
+	ErrInvalidTaskType = &Error{
+		Code: EInvalid,
+		Msg:  "invalid task type",
+	}
 	// ErrTaskNotFound indicates no task could be found for given parameters.
 	ErrTaskNotFound = &Error{
 		Code: ENotFound,
@@ -72,6 +77,12 @@ var (
 	ErrOutOfBoundsLimit = &Error{
 		Code: EUnprocessableEntity,
 		Msg:  "run limit is out of bounds, must be between 1 and 500",
+	}
+
+	// ErrMissingToken is called when trying to create a Task without providing a token
+	ErrMissingToken = &Error{
+		Code: EInvalid,
+		Msg:  "cannot create task without valid token",
 	}
 )
 

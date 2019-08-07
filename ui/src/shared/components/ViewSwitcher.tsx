@@ -16,19 +16,18 @@ import LatestValueTransform from 'src/shared/components/LatestValueTransform'
 // Types
 import {
   QueryViewProperties,
-  ViewType,
-  SingleStatView,
-  XYView,
-  XYViewGeom,
+  SingleStatViewProperties,
+  XYViewProperties,
   RemoteDataState,
   TimeZone,
+  CheckViewProperties,
 } from 'src/types'
 
 interface Props {
   giraffeResult: FromFluxResult
   files: string[]
   loading: RemoteDataState
-  properties: QueryViewProperties
+  properties: QueryViewProperties | CheckViewProperties
   timeZone: TimeZone
 }
 
@@ -40,7 +39,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
   timeZone,
 }) => {
   switch (properties.type) {
-    case ViewType.SingleStat:
+    case 'single-stat':
       return (
         <LatestValueTransform table={table}>
           {latestValue => (
@@ -49,7 +48,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
         </LatestValueTransform>
       )
 
-    case ViewType.Table:
+    case 'table':
       return (
         <FluxTablesTransform files={files}>
           {tables => (
@@ -62,7 +61,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
         </FluxTablesTransform>
       )
 
-    case ViewType.Gauge:
+    case 'gauge':
       return (
         <LatestValueTransform table={table}>
           {latestValue => (
@@ -70,8 +69,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
           )}
         </LatestValueTransform>
       )
-
-    case ViewType.XY:
+    case 'xy':
       return (
         <XYPlot
           table={table}
@@ -84,19 +82,19 @@ const ViewSwitcher: FunctionComponent<Props> = ({
         </XYPlot>
       )
 
-    case ViewType.LinePlusSingleStat:
+    case 'line-plus-single-stat':
       const xyProperties = {
         ...properties,
         colors: properties.colors.filter(c => c.type === 'scale'),
-        type: ViewType.XY,
-        geom: XYViewGeom.Line,
-      } as XYView
+        type: 'xy' as 'xy',
+        geom: 'line' as 'line',
+      } as XYViewProperties
 
       const singleStatProperties = {
         ...properties,
         colors: properties.colors.filter(c => c.type !== 'scale'),
-        type: ViewType.SingleStat,
-      } as SingleStatView
+        type: 'single-stat',
+      } as SingleStatViewProperties
 
       return (
         <XYPlot
@@ -121,7 +119,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
         </XYPlot>
       )
 
-    case ViewType.Histogram:
+    case 'histogram':
       return (
         <HistogramPlot
           table={table}
@@ -133,7 +131,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
         </HistogramPlot>
       )
 
-    case ViewType.Heatmap:
+    case 'heatmap':
       return (
         <HeatmapPlot
           table={table}
@@ -145,7 +143,7 @@ const ViewSwitcher: FunctionComponent<Props> = ({
         </HeatmapPlot>
       )
 
-    case ViewType.Scatter:
+    case 'scatter':
       return (
         <ScatterPlot
           table={table}

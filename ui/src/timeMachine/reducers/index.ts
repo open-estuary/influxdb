@@ -8,10 +8,7 @@ import {createView, defaultViewQuery} from 'src/shared/utils/view'
 import {isConfigValid, buildQuery} from 'src/timeMachine/utils/queryBuilder'
 
 // Constants
-import {
-  VEO_TIME_MACHINE_ID,
-  DE_TIME_MACHINE_ID,
-} from 'src/timeMachine/constants'
+import {TimeMachineID} from 'src/timeMachine/constants'
 import {AUTOREFRESH_DEFAULT} from 'src/shared/constants'
 import {
   THRESHOLD_TYPE_TEXT,
@@ -24,11 +21,10 @@ import {
   ViewType,
   DashboardDraftQuery,
   BuilderConfig,
-  QueryEditMode,
+  BuilderConfigAggregateWindow,
   QueryView,
   QueryViewProperties,
   ExtractWorkingView,
-  AggregateWindow,
 } from 'src/types/dashboards'
 import {Action} from 'src/timeMachine/actions'
 import {TimeMachineTab} from 'src/types/timeMachine'
@@ -39,7 +35,7 @@ interface QueryBuilderState {
   buckets: string[]
   bucketsStatus: RemoteDataState
   functions: Array<[{name: string}]>
-  aggregateWindow: AggregateWindow
+  aggregateWindow: BuilderConfigAggregateWindow
   tags: Array<{
     valuesSearchTerm: string
     keysSearchTerm: string
@@ -71,9 +67,11 @@ export interface TimeMachineState {
 }
 
 export interface TimeMachinesState {
-  activeTimeMachineID: string
+  activeTimeMachineID: TimeMachineID
   timeMachines: {
-    [timeMachineID: string]: TimeMachineState
+    ['de']: TimeMachineState
+    ['veo']: TimeMachineState
+    ['alerting']: TimeMachineState
   }
 }
 
@@ -83,7 +81,7 @@ export const initialStateHelper = (): TimeMachineState => ({
   view: createView(),
   draftQueries: [{...defaultViewQuery(), hidden: false}],
   isViewingRawData: false,
-  activeTab: TimeMachineTab.Queries,
+  activeTab: 'queries',
   activeQueryIndex: 0,
   queryResults: initialQueryResultsState(),
   queryBuilder: {
@@ -105,10 +103,11 @@ export const initialStateHelper = (): TimeMachineState => ({
 })
 
 export const initialState = (): TimeMachinesState => ({
-  activeTimeMachineID: DE_TIME_MACHINE_ID,
+  activeTimeMachineID: 'de',
   timeMachines: {
-    [VEO_TIME_MACHINE_ID]: initialStateHelper(),
-    [DE_TIME_MACHINE_ID]: initialStateHelper(),
+    veo: initialStateHelper(),
+    de: initialStateHelper(),
+    alerting: initialStateHelper(),
   },
 })
 
@@ -135,7 +134,7 @@ export const timeMachinesReducer = (
         [activeTimeMachineID]: {
           ...activeTimeMachine,
           ...initialState,
-          activeTab: TimeMachineTab.Queries,
+          activeTab: 'queries',
           isViewingRawData: false,
           activeQueryIndex: 0,
           draftQueries,
@@ -267,7 +266,7 @@ export const timeMachineReducer = (
       const {prefix, axis} = action.payload
       const viewType = state.view.properties.type
 
-      if (viewType === ViewType.Heatmap || viewType == ViewType.Scatter) {
+      if (viewType === 'heatmap' || viewType == 'scatter') {
         if (axis === 'x') {
           return setViewProperties(state, {xPrefix: prefix})
         }
@@ -280,7 +279,7 @@ export const timeMachineReducer = (
       const {suffix, axis} = action.payload
       const viewType = state.view.properties.type
 
-      if (viewType === ViewType.Heatmap || viewType === ViewType.Scatter) {
+      if (viewType === 'heatmap' || viewType === 'scatter') {
         if (axis === 'x') {
           return setViewProperties(state, {xSuffix: suffix})
         }
@@ -317,9 +316,9 @@ export const timeMachineReducer = (
       const {xAxisLabel} = action.payload
 
       switch (state.view.properties.type) {
-        case ViewType.Histogram:
-        case ViewType.Heatmap:
-        case ViewType.Scatter:
+        case 'histogram':
+        case 'heatmap':
+        case 'scatter':
           return setViewProperties(state, {xAxisLabel})
         default:
           return setYAxis(state, {label: xAxisLabel})
@@ -330,9 +329,9 @@ export const timeMachineReducer = (
       const {yAxisLabel} = action.payload
 
       switch (state.view.properties.type) {
-        case ViewType.Histogram:
-        case ViewType.Heatmap:
-        case ViewType.Scatter:
+        case 'histogram':
+        case 'heatmap':
+        case 'scatter':
           return setViewProperties(state, {yAxisLabel})
         default:
           return setYAxis(state, {label: yAxisLabel})
@@ -391,11 +390,12 @@ export const timeMachineReducer = (
       const {prefix} = action.payload
 
       switch (state.view.properties.type) {
-        case ViewType.Gauge:
-        case ViewType.SingleStat:
-        case ViewType.LinePlusSingleStat:
+        case 'gauge':
+        case 'single-stat':
+        case 'line-plus-single-stat':
           return setViewProperties(state, {prefix})
-        case ViewType.XY:
+        case 'check':
+        case 'xy':
           return setYAxis(state, {prefix})
         default:
           return state
@@ -406,11 +406,12 @@ export const timeMachineReducer = (
       const {suffix} = action.payload
 
       switch (state.view.properties.type) {
-        case ViewType.Gauge:
-        case ViewType.SingleStat:
-        case ViewType.LinePlusSingleStat:
+        case 'gauge':
+        case 'single-stat':
+        case 'line-plus-single-stat':
           return setViewProperties(state, {suffix})
-        case ViewType.XY:
+        case 'check':
+        case 'xy':
           return setYAxis(state, {suffix})
         default:
           return state
@@ -421,13 +422,14 @@ export const timeMachineReducer = (
       const {colors} = action.payload
 
       switch (state.view.properties.type) {
-        case ViewType.Gauge:
-        case ViewType.SingleStat:
-        case ViewType.Scatter:
-        case ViewType.XY:
-        case ViewType.Histogram:
+        case 'gauge':
+        case 'single-stat':
+        case 'scatter':
+        case 'check':
+        case 'xy':
+        case 'histogram':
           return setViewProperties(state, {colors})
-        case ViewType.LinePlusSingleStat:
+        case 'line-plus-single-stat':
           return setViewProperties(state, {
             colors: updateCorrectColors(state, colors),
           })
@@ -491,7 +493,7 @@ export const timeMachineReducer = (
       return produce(state, draftState => {
         const query = draftState.draftQueries[draftState.activeQueryIndex]
 
-        query.editMode = QueryEditMode.Builder
+        query.editMode = 'builder'
         query.hidden = false
 
         buildAllQueries(draftState)
@@ -504,7 +506,7 @@ export const timeMachineReducer = (
 
       draftQueries[activeQueryIndex] = {
         ...draftQueries[activeQueryIndex],
-        editMode: QueryEditMode.Advanced,
+        editMode: 'advanced',
       }
 
       return {
@@ -805,6 +807,16 @@ export const timeMachineReducer = (
         )
       })
     }
+
+    case 'REMOVE_CHECK': {
+      const view = convertView(state.view, 'xy')
+      return {...state, view, activeTab: 'queries'}
+    }
+
+    case 'ADD_CHECK': {
+      const view = convertView(state.view, 'check')
+      return {...state, view, activeTab: 'alerting'}
+    }
   }
 
   return state
@@ -909,7 +921,7 @@ const buildActiveQuery = (draftState: TimeMachineState) => {
 
 const buildAllQueries = (draftState: TimeMachineState) => {
   draftState.draftQueries
-    .filter(query => query.editMode === QueryEditMode.Builder)
+    .filter(query => query.editMode === 'builder')
     .forEach(query => {
       if (isConfigValid(query.builderConfig)) {
         query.text = buildQuery(query.builderConfig)

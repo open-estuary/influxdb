@@ -12,7 +12,7 @@ import {
 } from '@influxdata/clockface'
 
 // Components
-import {ResourceList} from 'src/clockface'
+import {ResourceCard} from '@influxdata/clockface'
 
 // Actions
 import {createResourceFromStaticTemplate} from 'src/templates/actions'
@@ -48,20 +48,18 @@ class StaticTemplateCard extends PureComponent<Props & WithRouterProps> {
     const {template} = this.props
 
     return (
-      <ResourceList.Card
+      <ResourceCard
         testID="template-card"
-        contextMenu={() => this.contextMenu}
-        description={() => this.description}
-        name={() => (
-          <ResourceList.Name
+        contextMenu={this.contextMenu}
+        description={this.description}
+        name={
+          <ResourceCard.Name
             onClick={this.handleNameClick}
             name={template.meta.name}
-            parentTestID="template-card--name"
-            buttonTestID="template-card--name-button"
-            inputTestID="template-card--input"
+            testID="template-card--name"
           />
-        )}
-        metaData={() => [this.templateType]}
+        }
+        metaData={[this.templateType]}
       />
     )
   }
@@ -88,7 +86,7 @@ class StaticTemplateCard extends PureComponent<Props & WithRouterProps> {
     const description = _.get(template, 'content.data.attributes.description')
 
     return (
-      <ResourceList.Description description={description || 'No description'} />
+      <ResourceCard.Description description={description || 'No description'} />
     )
   }
 

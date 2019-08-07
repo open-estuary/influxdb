@@ -5,9 +5,16 @@ import {
 } from 'src/dashboards/apis/'
 
 // Types
-import {RemoteDataState} from 'src/types'
+import {RemoteDataState, QueryView} from 'src/types'
 import {Dispatch} from 'redux'
 import {View} from 'src/types'
+import {Action as TimeMachineAction} from 'src/timeMachine/actions'
+import {Action as CheckAction} from 'src/alerting/actions/checks'
+
+//Actions
+import {setActiveTimeMachine} from 'src/timeMachine/actions'
+import {TimeMachineID} from 'src/timeMachine/constants'
+import {setCurrentCheck} from 'src/alerting/actions/checks'
 
 export type Action = SetViewAction | SetViewsAction | ResetViewsAction
 
@@ -81,5 +88,25 @@ export const updateView = (dashboardID: string, view: View) => async (
     return newView
   } catch {
     dispatch(setView(viewID, null, RemoteDataState.Error))
+  }
+}
+
+export const getViewForTimeMachine = (
+  dashboardID: string,
+  cellID: string,
+  timeMachineID: TimeMachineID
+) => async (
+  dispatch: Dispatch<Action | TimeMachineAction | CheckAction>
+): Promise<void> => {
+  dispatch(setView(cellID, null, RemoteDataState.Loading))
+  try {
+    const view = (await getViewAJAX(dashboardID, cellID)) as QueryView
+    if (view.properties.type === 'check') {
+      dispatch(setCurrentCheck(RemoteDataState.Done, view.properties.check))
+    }
+    dispatch(setView(cellID, view, RemoteDataState.Done))
+    dispatch(setActiveTimeMachine(timeMachineID, {view}))
+  } catch {
+    dispatch(setView(cellID, null, RemoteDataState.Error))
   }
 }

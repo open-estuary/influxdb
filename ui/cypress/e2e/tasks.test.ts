@@ -1,4 +1,5 @@
-import {Organization, Bucket} from '@influxdata/influx'
+import {Organization, Bucket} from '../../src/types'
+import _ from 'lodash'
 
 describe('Tasks', () => {
   beforeEach(() => {
@@ -7,6 +8,14 @@ describe('Tasks', () => {
     cy.signin().then(({body}) => {
       cy.wrap(body.org).as('org')
       cy.wrap(body.bucket).as('bucket')
+
+      cy.createToken(body.org.id, 'test token', 'active', [
+        {action: 'write', resource: {type: 'views'}},
+        {action: 'write', resource: {type: 'documents'}},
+        {action: 'write', resource: {type: 'tasks'}},
+      ]).then(({body}) => {
+        cy.wrap(body.token).as('token')
+      })
     })
 
     cy.fixture('routes').then(({orgs}) => {
@@ -16,38 +25,47 @@ describe('Tasks', () => {
     })
   })
 
+  it('cannot create a task with an invalid to() function', () => {
+    const taskName = 'Bad Task'
+
+    createFirstTask(taskName, ({name}) => {
+      return `import "influxdata/influxdb/v1"
+v1.tagValues(bucket: "${name}", tag: "_field")
+from(bucket: "${name}")
+  |> range(start: -2m)
+  |> to(bucket: "${name}")`
+    })
+
+    cy.contains('Save').click()
+
+    cy.getByTestID('notification-error').should(
+      'contain',
+      'error calling function "to": missing required keyword argument "orgID"'
+    )
+  })
+
   it('can create a task', () => {
     const taskName = 'Task'
-    cy.get('.empty-state').within(() => {
-      cy.contains('Create').click()
+    createFirstTask(taskName, ({name}) => {
+      return `import "influxdata/influxdb/v1"
+v1.tagValues(bucket: "${name}", tag: "_field")
+from(bucket: "${name}")
+  |> range(start: -2m)`
     })
 
-    cy.getByTestID('dropdown--item new').click()
+    cy.contains('Save').click()
 
-    cy.getByInputName('name').type(taskName)
-    cy.getByInputName('interval').type('24h')
-    cy.getByInputName('offset').type('20m')
-
-    cy.get<Bucket>('@bucket').then(({name}) => {
-      cy.getByTestID('flux-editor').within(() => {
-        cy.get('textarea').type(
-          `import "influxdata/influxdb/v1"\nv1.tagValues(bucket: "${name}", tag: "_field")\nfrom(bucket: "${name}")\n|> range(start: -2m)`,
-          {force: true}
-        )
-      })
-
-      cy.contains('Save').click()
-
-      cy.getByTestID('task-card')
-        .should('have.length', 1)
-        .and('contain', taskName)
-    })
+    cy.getByTestID('task-card')
+      .should('have.length', 1)
+      .and('contain', taskName)
   })
 
   it('can delete a task', () => {
     cy.get<Organization>('@org').then(({id}) => {
-      cy.createTask(id)
-      cy.createTask(id)
+      cy.get<string>('@token').then(token => {
+        cy.createTask(token, id)
+        cy.createTask(token, id)
+      })
 
       cy.fixture('routes').then(({orgs}) => {
         cy.visit(`${orgs}/${id}/tasks`)
@@ -69,7 +87,9 @@ describe('Tasks', () => {
 
   it('can disable a task', () => {
     cy.get<Organization>('@org').then(({id}) => {
-      cy.createTask(id)
+      cy.get<string>('@token').then(token => {
+        cy.createTask(token, id)
+      })
     })
 
     cy.getByTestID('task-card--slide-toggle').should('have.class', 'active')
@@ -81,7 +101,9 @@ describe('Tasks', () => {
 
   it('can edit a tasks name', () => {
     cy.get<Organization>('@org').then(({id}) => {
-      cy.createTask(id)
+      cy.get<string>('@token').then(token => {
+        cy.createTask(token, id)
+      })
     })
 
     const newName = 'Task'
@@ -91,7 +113,7 @@ describe('Tasks', () => {
 
       cy.getByTestID('task-card--name-button').click()
 
-      cy.get('.input-field')
+      cy.get('.cf-input-field')
         .type(newName)
         .type('{enter}')
     })
@@ -106,19 +128,7 @@ describe('Tasks', () => {
   })
 
   it('fails to create a task without a valid script', () => {
-    cy.get('.empty-state').within(() => {
-      cy.contains('Create').click()
-    })
-
-    cy.getByTestID('dropdown--item new').click()
-
-    cy.getByInputName('name').type('Task')
-    cy.getByInputName('interval').type('24h')
-    cy.getByInputName('offset').type('20m')
-
-    cy.getByTestID('flux-editor').within(() => {
-      cy.get('textarea').type('{}', {force: true})
-    })
+    createFirstTask('Task', () => '{}')
 
     cy.contains('Save').click()
 
@@ -130,12 +140,14 @@ describe('Tasks', () => {
       const newLabelName = 'click-me'
 
       cy.get<Organization>('@org').then(({id}) => {
-        cy.createTask(id).then(({body}) => {
-          cy.createAndAddLabel('tasks', id, body.id, newLabelName)
-        })
+        cy.get<string>('@token').then(token => {
+          cy.createTask(token, id).then(({body}) => {
+            cy.createAndAddLabel('tasks', id, body.id, newLabelName)
+          })
 
-        cy.createTask(id).then(({body}) => {
-          cy.createAndAddLabel('tasks', id, body.id, 'bar')
+          cy.createTask(token, id).then(({body}) => {
+            cy.createAndAddLabel('tasks', id, body.id, 'bar')
+          })
         })
       })
 
@@ -157,8 +169,10 @@ describe('Tasks', () => {
     it('can search by task name', () => {
       const searchName = 'beepBoop'
       cy.get<Organization>('@org').then(({id}) => {
-        cy.createTask(id, searchName)
-        cy.createTask(id)
+        cy.get<string>('@token').then(token => {
+          cy.createTask(token, id, searchName)
+          cy.createTask(token, id)
+        })
       })
 
       cy.fixture('routes').then(({orgs}) => {
@@ -173,3 +187,21 @@ describe('Tasks', () => {
     })
   })
 })
+
+function createFirstTask(name: string, flux: (bucket: Bucket) => string) {
+  cy.getByTestID('empty-tasks-list').within(() => {
+    cy.getByTestID('add-resource-dropdown--button').click()
+  })
+
+  cy.getByTestID('add-resource-dropdown--new').click()
+
+  cy.getByInputName('name').type(name)
+  cy.getByInputName('interval').type('24h')
+  cy.getByInputName('offset').type('20m')
+
+  cy.get<Bucket>('@bucket').then(bucket => {
+    cy.getByTestID('flux-editor').within(() => {
+      cy.get('textarea').type(flux(bucket), {force: true})
+    })
+  })
+}

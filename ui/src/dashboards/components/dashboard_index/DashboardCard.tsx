@@ -4,8 +4,8 @@ import {connect} from 'react-redux'
 import {withRouter, WithRouterProps} from 'react-router'
 
 // Components
-import {IconFont, ComponentColor} from '@influxdata/clockface'
-import {ResourceList, Context} from 'src/clockface'
+import {IconFont, ComponentColor, ResourceCard} from '@influxdata/clockface'
+import {Context} from 'src/clockface'
 import InlineLabels from 'src/shared/components/inlineLabels/InlineLabels'
 
 // Actions
@@ -19,8 +19,7 @@ import {createLabel as createLabelAsync} from 'src/labels/actions'
 import {viewableLabels} from 'src/labels/selectors'
 
 // Types
-import {ILabel} from '@influxdata/influx'
-import {AppState, Dashboard} from 'src/types'
+import {AppState, Dashboard, Label} from 'src/types'
 
 // Constants
 import {DEFAULT_DASHBOARD_NAME} from 'src/dashboards/constants'
@@ -35,7 +34,7 @@ interface PassedProps {
 }
 
 interface StateProps {
-  labels: ILabel[]
+  labels: Label[]
 }
 
 interface DispatchProps {
@@ -53,39 +52,39 @@ class DashboardCard extends PureComponent<Props> {
     const {id} = dashboard
 
     return (
-      <ResourceList.Card
+      <ResourceCard
         key={`dashboard-id--${id}`}
         testID="dashboard-card"
-        name={() => (
-          <ResourceList.EditableName
+        name={
+          <ResourceCard.EditableName
             onUpdate={this.handleUpdateDashboard}
             onClick={this.handleClickDashboard}
             name={dashboard.name}
             noNameString={DEFAULT_DASHBOARD_NAME}
-            parentTestID="dashboard-card--name"
+            testID="dashboard-card--name"
             buttonTestID="dashboard-card--name-button"
             inputTestID="dashboard-card--input"
           />
-        )}
-        description={() => (
-          <ResourceList.Description
+        }
+        description={
+          <ResourceCard.EditableDescription
             onUpdate={this.handleUpdateDescription}
             description={dashboard.description}
             placeholder={`Describe ${dashboard.name}`}
           />
-        )}
-        labels={() => (
+        }
+        labels={
           <InlineLabels
-            selectedLabels={dashboard.labels}
+            selectedLabels={dashboard.labels as Label[]}
             labels={labels}
             onFilterChange={onFilterChange}
             onAddLabel={this.handleAddLabel}
             onRemoveLabel={this.handleRemoveLabel}
             onCreateLabel={this.handleCreateLabel}
           />
-        )}
-        updatedAt={dashboard.meta.updatedAt}
-        contextMenu={() => this.contextMenu}
+        }
+        metaData={[<>Last updated: {dashboard.meta.updatedAt}</>]}
+        contextMenu={this.contextMenu}
       />
     )
   }
@@ -134,15 +133,15 @@ class DashboardCard extends PureComponent<Props> {
 
   private handleClickDashboard = () => {
     const {
+      onResetViews,
       router,
       dashboard,
-      onResetViews,
       params: {orgID},
     } = this.props
 
-    onResetViews()
-
     router.push(`/orgs/${orgID}/dashboards/${dashboard.id}`)
+
+    onResetViews()
   }
 
   private handleUpdateDescription = (description: string): void => {
@@ -152,19 +151,19 @@ class DashboardCard extends PureComponent<Props> {
     onUpdateDashboard(dashboard)
   }
 
-  private handleAddLabel = (label: ILabel): void => {
+  private handleAddLabel = (label: Label): void => {
     const {dashboard, onAddDashboardLabels} = this.props
 
-    onAddDashboardLabels(dashboard.id, [label])
+    onAddDashboardLabels(dashboard.id, [label as any])
   }
 
-  private handleRemoveLabel = (label: ILabel): void => {
+  private handleRemoveLabel = (label: Label): void => {
     const {dashboard, onRemoveDashboardLabels} = this.props
 
-    onRemoveDashboardLabels(dashboard.id, [label])
+    onRemoveDashboardLabels(dashboard.id, [label as any])
   }
 
-  private handleCreateLabel = async (label: ILabel): Promise<void> => {
+  private handleCreateLabel = async (label: Label): Promise<void> => {
     try {
       await this.props.onCreateLabel(label.name, label.properties)
 

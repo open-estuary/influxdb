@@ -1,5 +1,6 @@
 import 'babel-polyfill'
 import 'src/cloud/utils/overrides'
+import 'abortcontroller-polyfill/dist/polyfill-patch-fetch'
 
 import React, {PureComponent} from 'react'
 import {render} from 'react-dom'
@@ -39,7 +40,8 @@ import GetMe from 'src/shared/containers/GetMe'
 import Notifications from 'src/shared/containers/Notifications'
 import TaskExportOverlay from 'src/tasks/components/TaskExportOverlay'
 import TaskImportOverlay from 'src/tasks/components/TaskImportOverlay'
-import VEO from 'src/dashboards/components/VEO'
+import EditVEO from 'src/dashboards/components/EditVEO'
+import NewVEO from 'src/dashboards/components/NewVEO'
 import NoteEditorOverlay from 'src/dashboards/components/NoteEditorOverlay'
 import OnboardingWizardPage from 'src/onboarding/containers/OnboardingWizardPage'
 import BucketsIndex from 'src/buckets/containers/BucketsIndex'
@@ -76,6 +78,11 @@ import TaskImportFromTemplateOverlay from './tasks/components/TaskImportFromTemp
 import StaticTemplateViewOverlay from 'src/templates/components/StaticTemplateViewOverlay'
 import AlertingIndex from 'src/alerting/containers/AlertingIndex'
 import AlertHistoryIndex from 'src/alerting/containers/AlertHistoryIndex'
+import BucketsDeleteDataOverlay from 'src/shared/components/DeleteDataOverlay'
+import DEDeleteDataOverlay from 'src/dataExplorer/components/DeleteDataOverlay'
+import NewCheckEO from 'src/alerting/components/NewCheckEO'
+import EditCheckEO from 'src/alerting/components/EditCheckEO'
+import NewRuleOverlay from 'src/alerting/components/notifications/NewRuleOverlay'
 
 import {FeatureFlag} from 'src/shared/utils/featureFlag'
 
@@ -169,6 +176,10 @@ class Root extends PureComponent {
                             component={DataExplorerPage}
                           >
                             <Route path="save" component={SaveAsOverlay} />
+                            <Route
+                              path="delete-data"
+                              component={DEDeleteDataOverlay}
+                            />
                           </Route>
                           <Route path="dashboards" component={DashboardsIndex}>
                             <Route
@@ -189,8 +200,8 @@ class Root extends PureComponent {
                             component={DashboardPage}
                           >
                             <Route path="cells">
-                              <Route path="new" component={VEO} />
-                              <Route path=":cellID/edit" component={VEO} />
+                              <Route path="new" component={NewVEO} />
+                              <Route path=":cellID/edit" component={EditVEO} />
                             </Route>
                             <Route path="notes">
                               <Route path="new" component={NoteEditorOverlay} />
@@ -222,6 +233,10 @@ class Root extends PureComponent {
                               <Route
                                 path="edit"
                                 component={UpdateBucketOverlay}
+                              />
+                              <Route
+                                path="delete-data"
+                                component={BucketsDeleteDataOverlay}
                               />
                               <Route
                                 path="rename"
@@ -303,7 +318,21 @@ class Root extends PureComponent {
                             />
                           </Route>
                           <FeatureFlag name="alerting">
-                            <Route path="alerting" component={AlertingIndex} />
+                            <Route path="alerting" component={AlertingIndex}>
+                              <Route path="checks/new" component={NewCheckEO} />
+                              <Route
+                                path="checks/:checkID/edit"
+                                component={EditCheckEO}
+                              />
+                              <Route
+                                path="rules/new"
+                                component={NewRuleOverlay}
+                              />
+                              <Route
+                                path="rules/:ruleID/edit"
+                                component={null}
+                              />
+                            </Route>
                             <Route
                               path="alert-history"
                               component={AlertHistoryIndex}

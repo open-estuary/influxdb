@@ -4,11 +4,10 @@ import _ from 'lodash'
 import {connect} from 'react-redux'
 
 // Components
-import {Dropdown, ComponentStatus} from 'src/clockface'
+import {Dropdown, ComponentStatus} from '@influxdata/clockface'
 
 // Types
-import {Bucket} from '@influxdata/influx'
-import {RemoteDataState, AppState} from 'src/types'
+import {RemoteDataState, AppState, Bucket} from 'src/types'
 
 interface OwnProps {
   onChangeBucketName: (selectedBucketName: string) => void
@@ -34,14 +33,25 @@ class TaskOptionsBucketDropdown extends PureComponent<Props> {
   }
 
   public render() {
+    const {selectedBucketName} = this.props
+
     return (
       <Dropdown
-        selectedID={this.selectedName}
-        onChange={this.props.onChangeBucketName}
-        status={this.status}
-      >
-        {this.dropdownItems}
-      </Dropdown>
+        button={(active, onClick) => (
+          <Dropdown.Button
+            active={active}
+            onClick={onClick}
+            status={this.status}
+          >
+            {selectedBucketName}
+          </Dropdown.Button>
+        )}
+        menu={onCollapse => (
+          <Dropdown.Menu onCollapse={onCollapse}>
+            {this.dropdownItems}
+          </Dropdown.Menu>
+        )}
+      />
     )
   }
 
@@ -51,7 +61,13 @@ class TaskOptionsBucketDropdown extends PureComponent<Props> {
     if (buckets && buckets.length) {
       return buckets.map(bucket => {
         return (
-          <Dropdown.Item id={bucket.name} key={bucket.name} value={bucket.name}>
+          <Dropdown.Item
+            id={bucket.name}
+            key={bucket.name}
+            value={bucket.name}
+            onClick={this.props.onChangeBucketName}
+            selected={bucket.id === this.selectedName}
+          >
             {bucket.name}
           </Dropdown.Item>
         )
@@ -59,7 +75,7 @@ class TaskOptionsBucketDropdown extends PureComponent<Props> {
     } else {
       return [
         <Dropdown.Item id="no-buckets" key="no-buckets" value="no-buckets">
-          {'no buckets found in org'}
+          No Buckets found in Org
         </Dropdown.Item>,
       ]
     }

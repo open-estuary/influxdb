@@ -17,17 +17,21 @@ import {VIS_THEME} from 'src/shared/constants'
 import {INVALID_DATA_COPY} from 'src/shared/copy/cell'
 
 // Types
-import {RemoteDataState, CheckView, TimeZone, ThresholdConfig} from 'src/types'
+import {
+  RemoteDataState,
+  CheckViewProperties,
+  TimeZone,
+  Threshold,
+} from 'src/types'
 
 const X_COLUMN = '_time'
 const Y_COLUMN = '_value'
 
-const THRESHOLDS: ThresholdConfig[] = [
+const THRESHOLDS: Threshold[] = [
   {
-    type: 'less',
-    allValues: false,
     level: 'UNKNOWN',
-    value: 20,
+    lowerBound: 20,
+    allValues: false,
   },
 ]
 
@@ -36,7 +40,7 @@ interface Props {
   fluxGroupKeyUnion: string[]
   loading: RemoteDataState
   timeZone: TimeZone
-  viewProperties: CheckView
+  viewProperties: CheckViewProperties
   children: (config: Config) => JSX.Element
 }
 
@@ -46,12 +50,11 @@ const CheckPlot: FunctionComponent<Props> = ({
   loading,
   children,
   timeZone,
-  viewProperties: {yDomain: storedYDomain},
 }) => {
   const [thresholds, setThresholds] = useState(THRESHOLDS)
 
   const [yDomain, onSetYDomain, onResetYDomain] = useVisDomainSettings(
-    storedYDomain,
+    [0, 100],
     table.getColumn(Y_COLUMN, 'number')
   )
 

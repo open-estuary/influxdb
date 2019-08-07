@@ -1,4 +1,4 @@
-import {Organization} from '@influxdata/influx'
+import {Organization} from '../../src/types'
 
 describe('tokens', () => {
   let authData: {description: string; status: boolean; id: string}[]
@@ -93,7 +93,11 @@ describe('tokens', () => {
     cy.getByTestID('table-row').then(rows => {
       authData = authData.sort((a, b) =>
         // eslint-disable-next-line
-        a.description < b.description ? -1 : a.description > b.description ? 1 : 0
+        a.description < b.description
+          ? -1
+          : a.description > b.description
+          ? 1
+          : 0
       )
 
       for (var i = 0; i < rows.length; i++) {
@@ -146,9 +150,9 @@ describe('tokens', () => {
             // @ts-ignore
             cy.request(
               'api/v2/authorizations/' +
-                authData.find(function(item) {
+                (authData.find(function(item) {
                   return item.description === 'token test 02'
-                }).id
+                }) as any).id
             ).then(resp => {
               expect(resp.body.status).equals('active')
             })
@@ -176,9 +180,9 @@ describe('tokens', () => {
             // @ts-ignore
             cy.request(
               'api/v2/authorizations/' +
-                authData.find(function(item) {
+                (authData.find(function(item) {
                   return item.description === 'token test 02'
-                }).id
+                }) as any).id
             ).then(resp => {
               expect(resp.body.status).equals('inactive')
             })
@@ -227,8 +231,8 @@ describe('tokens', () => {
 
       // open overlay
       cy.getByTestID('dropdown-button--gen-token').click()
-      cy.getByTestIDSubStr('dropdown--item').should('have.length', 2)
-      cy.getByTestID('dropdown--item Read/Write Token').click()
+      cy.getByTestIDSubStr('dropdown-item').should('have.length', 2)
+      cy.getByTestID('dropdown-item generate-token--read-write').click()
       cy.getByTestID('overlay--container').should('be.visible')
 
       //check cancel
@@ -238,8 +242,8 @@ describe('tokens', () => {
 
       // open overlay - again
       cy.getByTestID('dropdown-button--gen-token').click()
-      cy.getByTestIDSubStr('dropdown--item').should('have.length', 2)
-      cy.getByTestID('dropdown--item Read/Write Token').click()
+      cy.getByTestIDSubStr('dropdown-item').should('have.length', 2)
+      cy.getByTestID('dropdown-item generate-token--read-write').click()
       cy.getByTestID('overlay--container').should('be.visible')
 
       //Create a token  //todo filters in this or seperate test
@@ -257,7 +261,6 @@ describe('tokens', () => {
         })
 
       cy.getByTestID('button--save').click()
-      cy.getByTestID('overlay--container').should('not.be.visible')
 
       //Verify token
       cy.getByTestID('table-row')
