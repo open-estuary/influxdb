@@ -115,23 +115,8 @@ func RangeThresholdFunction(c check.ThresholdConfig) ast.Statement {
 }
 
 func MessageFunction(m string) ast.Statement {
-
-	return &ast.VariableAssignment{
-		ID: &ast.Identifier{
-			Name: "messageFn",
-		},
-		Init: &ast.FunctionExpression{
-			Params: []*ast.Property{
-				&ast.Property{
-					Key: &ast.Identifier{Name: "r"},
-				},
-				&ast.Property{
-					Key: &ast.Identifier{Name: "check"},
-				},
-			},
-			Body: &ast.StringLiteral{Value: m}, // TODO: call string interpolation here.
-		},
-	}
+	fn := Function(FunctionParams("r", "check"), String(m))
+	return DefineVariable("messageFn", fn)
 }
 
 func ChecksFunction(t check.Threshold) *ast.ExpressionStatement {
@@ -277,7 +262,7 @@ func TestThreshold_FluxAST(t *testing.T) {
 				{Key: "aaa", Value: "vaaa"},
 				{Key: "bbb", Value: "vbbb"},
 			},
-			StatusMessageTemplate: "whoa!",
+			StatusMessageTemplate: "whoa! {check.yeah}",
 		},
 		Thresholds: []check.ThresholdConfig{
 			check.ThresholdConfig{
