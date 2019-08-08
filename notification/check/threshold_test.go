@@ -29,16 +29,11 @@ func ImportStatement() *ast.ImportDeclaration {
 }
 
 func GenerateBody(t check.Threshold) []ast.Statement {
-	statements := []ast.Statement{}
-
+	var statements []ast.Statement
 	statements = append(statements, CheckDefinition(t))
-
 	statements = append(statements, ThresholdFunctions(t.Thresholds)...)
-
 	statements = append(statements, MessageFunction(t.StatusMessageTemplate))
-
 	statements = append(statements, ChecksFunction(t))
-
 	return statements
 }
 
@@ -235,19 +230,44 @@ func ObjectPropertyTags(tags []notification.Tag) *ast.Property {
 	}
 }
 
+func String(s string) *ast.StringLiteral {
+	return &ast.StringLiteral{
+		Value: s,
+	}
+}
+
 func CheckDefinition(t check.Threshold) ast.Statement {
-	properties := []*ast.Property{}
+	tagProperties := []*ast.Property{}
+	for _, tag := range t.Tags {
+		tagProperties = append(tagProperties, Property(tag.Key, String(tag.Value)))
+	}
+	tags := Property("tags", Object(tagProperties...))
+	checkID := Property("checkID", String(t.ID.String()))
 
-	properties = append(properties, ObjectPropertyString("checkID", t.ID.String()))
-	properties = append(properties, ObjectPropertyTags(t.Tags))
+	return DefineVariable("check", Object(checkID, tags))
+}
 
+func DefineVariable(id string, e ast.Expression) *ast.VariableAssignment {
 	return &ast.VariableAssignment{
 		ID: &ast.Identifier{
-			Name: "check",
+			Name: id,
 		},
-		Init: &ast.ObjectExpression{
-			Properties: properties,
+		Init: e,
+	}
+}
+
+func Property(key string, e ast.Expression) *ast.Property {
+	return &ast.Property{
+		Key: &ast.Identifier{
+			Name: key,
 		},
+		Value: e,
+	}
+}
+
+func Object(ps ...*ast.Property) *ast.ObjectExpression {
+	return &ast.ObjectExpression{
+		Properties: ps,
 	}
 }
 
