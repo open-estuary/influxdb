@@ -54,91 +54,64 @@ func ThresholdFunctions(cs []check.ThresholdConfig) []ast.Statement {
 }
 
 func GreaterThresholdFunction(c check.ThresholdConfig) ast.Statement {
-	return &ast.VariableAssignment{
-		ID: &ast.Identifier{
-			Name: strings.ToLower(c.Level.String()),
-		},
-		Init: &ast.FunctionExpression{
-			Params: []*ast.Property{
-				&ast.Property{
-					Key: &ast.Identifier{Name: "r"},
-				},
-			},
-			Body: &ast.BinaryExpression{
-				Operator: ast.GreaterThanOperator,
-				Left: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "r"},
-					Property: &ast.Identifier{Name: "_value"},
-				},
-				Right: &ast.FloatLiteral{
-					Value: *c.LowerBound,
-				},
-			},
-		},
+	lvl := strings.ToLower(c.Level.String())
+
+	fnBody := GreaterThan(Member("r", "_value"), Float(*c.LowerBound))
+	fn := Function(FunctionParams("r"), fnBody)
+
+	return DefineVariable(lvl, fn)
+}
+
+func GreaterThan(lhs, rhs ast.Expression) ast.Expression {
+	return &ast.BinaryExpression{
+		Operator: ast.GreaterThanOperator,
+		Left:     lhs,
+		Right:    rhs,
+	}
+}
+
+func LessThan(lhs, rhs ast.Expression) ast.Expression {
+	return &ast.BinaryExpression{
+		Operator: ast.LessThanOperator,
+		Left:     lhs,
+		Right:    rhs,
+	}
+}
+
+func Member(p, c string) *ast.MemberExpression {
+	return &ast.MemberExpression{
+		Object:   &ast.Identifier{Name: p},
+		Property: &ast.Identifier{Name: c},
 	}
 }
 
 func LesserThresholdFunction(c check.ThresholdConfig) ast.Statement {
-	return &ast.VariableAssignment{
-		ID: &ast.Identifier{
-			Name: strings.ToLower(c.Level.String()),
-		},
-		Init: &ast.FunctionExpression{
-			Params: []*ast.Property{
-				&ast.Property{
-					Key: &ast.Identifier{Name: "r"},
-				},
-			},
-			Body: &ast.BinaryExpression{
-				Operator: ast.LessThanOperator,
-				Left: &ast.MemberExpression{
-					Object:   &ast.Identifier{Name: "r"},
-					Property: &ast.Identifier{Name: "_value"},
-				},
-				Right: &ast.FloatLiteral{
-					Value: *c.UpperBound,
-				},
-			},
-		},
+	fnBody := LessThan(Member("r", "_value"), Float(*c.UpperBound))
+	fn := Function(FunctionParams("r"), fnBody)
+
+	lvl := strings.ToLower(c.Level.String())
+
+	return DefineVariable(lvl, fn)
+}
+
+func And(lhs, rhs ast.Expression) ast.Expression {
+	return &ast.LogicalExpression{
+		Operator: ast.AndOperator,
+		Left:     lhs,
+		Right:    rhs,
 	}
 }
 
 func RangeThresholdFunction(c check.ThresholdConfig) ast.Statement {
-	return &ast.VariableAssignment{
-		ID: &ast.Identifier{
-			Name: strings.ToLower(c.Level.String()),
-		},
-		Init: &ast.FunctionExpression{
-			Params: []*ast.Property{
-				&ast.Property{
-					Key: &ast.Identifier{Name: "r"},
-				},
-			},
-			Body: &ast.LogicalExpression{
-				Operator: ast.AndOperator,
-				Left: &ast.BinaryExpression{
-					Operator: ast.GreaterThanOperator,
-					Left: &ast.MemberExpression{
-						Object:   &ast.Identifier{Name: "r"},
-						Property: &ast.Identifier{Name: "_value"},
-					},
-					Right: &ast.FloatLiteral{
-						Value: *c.LowerBound,
-					},
-				},
-				Right: &ast.BinaryExpression{
-					Operator: ast.LessThanOperator,
-					Left: &ast.MemberExpression{
-						Object:   &ast.Identifier{Name: "r"},
-						Property: &ast.Identifier{Name: "_value"},
-					},
-					Right: &ast.FloatLiteral{
-						Value: *c.UpperBound,
-					},
-				},
-			},
-		},
-	}
+	fnBody := And(
+		LessThan(Member("r", "_value"), Float(*c.UpperBound)),
+		GreaterThan(Member("r", "_value"), Float(*c.LowerBound)),
+	)
+	fn := Function(FunctionParams("r"), fnBody)
+
+	lvl := strings.ToLower(c.Level.String())
+
+	return DefineVariable(lvl, fn)
 }
 
 func MessageFunction(m string) ast.Statement {
@@ -234,6 +207,27 @@ func String(s string) *ast.StringLiteral {
 	return &ast.StringLiteral{
 		Value: s,
 	}
+}
+
+func Float(f float64) *ast.FloatLiteral {
+	return &ast.FloatLiteral{
+		Value: f,
+	}
+}
+
+func Function(params []*ast.Property, b ast.Expression) *ast.FunctionExpression {
+	return &ast.FunctionExpression{
+		Params: params,
+		Body:   b,
+	}
+}
+
+func FunctionParams(args ...string) []*ast.Property {
+	var params []*ast.Property
+	for _, arg := range args {
+		params = append(params, &ast.Property{Key: &ast.Identifier{Name: arg}})
+	}
+	return params
 }
 
 func CheckDefinition(t check.Threshold) ast.Statement {
