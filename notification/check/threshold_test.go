@@ -182,32 +182,35 @@ func AppendPipe(base ast.Expression, next *ast.CallExpression) *ast.PipeExpressi
 }
 
 func ChecksCall(t check.Threshold) *ast.CallExpression {
-	return &ast.CallExpression{Callee: &ast.MemberExpression{
-		Object: &ast.Identifier{Name: "alerts"}, Property: &ast.Identifier{Name: "check"},
-	}, Arguments: []ast.Expression{
-		&ast.ObjectExpression{
-			Properties: []*ast.Property{
-				{
-					Key: &ast.Identifier{Name: "check"}, Value: &ast.Identifier{Name: "check"},
-				},
-				{
-					Key: &ast.Identifier{Name: "messageFn"}, Value: &ast.Identifier{Name: "messageFn"},
-				},
-				{
-					Key: &ast.Identifier{Name: "ok"}, Value: &ast.Identifier{Name: "ok"},
-				},
-				{
-					Key: &ast.Identifier{Name: "info"}, Value: &ast.Identifier{Name: "info"},
-				},
-				{
-					Key: &ast.Identifier{Name: "warn"}, Value: &ast.Identifier{Name: "warn"},
-				},
-				{
-					Key: &ast.Identifier{Name: "crit"}, Value: &ast.Identifier{Name: "crit"},
+	return &ast.CallExpression{
+		Callee: &ast.MemberExpression{
+			Object:   &ast.Identifier{Name: "alerts"},
+			Property: &ast.Identifier{Name: "check"},
+		},
+		Arguments: []ast.Expression{
+			&ast.ObjectExpression{
+				Properties: []*ast.Property{
+					{
+						Key: &ast.Identifier{Name: "check"}, Value: &ast.Identifier{Name: "check"},
+					},
+					{
+						Key: &ast.Identifier{Name: "messageFn"}, Value: &ast.Identifier{Name: "messageFn"},
+					},
+					{
+						Key: &ast.Identifier{Name: "ok"}, Value: &ast.Identifier{Name: "ok"},
+					},
+					{
+						Key: &ast.Identifier{Name: "info"}, Value: &ast.Identifier{Name: "info"},
+					},
+					{
+						Key: &ast.Identifier{Name: "warn"}, Value: &ast.Identifier{Name: "warn"},
+					},
+					{
+						Key: &ast.Identifier{Name: "crit"}, Value: &ast.Identifier{Name: "crit"},
+					},
 				},
 			},
 		},
-	},
 	}
 }
 
