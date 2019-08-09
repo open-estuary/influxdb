@@ -3,7 +3,7 @@ import React, {FunctionComponent} from 'react'
 import {connect} from 'react-redux'
 
 // Components
-import {Button, ComponentStatus} from '@influxdata/clockface'
+import {Button, ComponentColor, IconFont} from '@influxdata/clockface'
 
 // Utils
 import {getActiveTimeMachine} from 'src/timeMachine/selectors'
@@ -28,21 +28,25 @@ const CheckAlertingButton: FunctionComponent<Props> = ({
   setActiveTab,
   activeTab,
 }) => {
-  let buttonStatus = ComponentStatus.Default
-  if (activeTab === 'alerting') {
-    buttonStatus = ComponentStatus.Disabled
-  }
-
   const handleClick = () => {
-    setActiveTab('alerting')
+    if (activeTab === 'alerting') {
+      setActiveTab('queries')
+    } else {
+      setActiveTab('alerting')
+    }
   }
 
   return (
     <Button
+      icon={IconFont.BellSolid}
+      color={
+        activeTab === 'alerting'
+          ? ComponentColor.Secondary
+          : ComponentColor.Default
+      }
       titleText="Add alerting to this query"
       text="Alerting"
       onClick={handleClick}
-      status={buttonStatus}
     />
   )
 }

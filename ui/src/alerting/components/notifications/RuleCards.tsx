@@ -6,33 +6,31 @@ import NotificationRuleCard from 'src/alerting/components/notifications/RuleCard
 import {EmptyState, ResourceList} from '@influxdata/clockface'
 
 // Types
-import {NotificationRule} from 'src/types'
+import {NotificationRuleDraft} from 'src/types'
 import {ComponentSize} from '@influxdata/clockface'
 
 interface Props {
-  rules: NotificationRule[]
+  rules: NotificationRuleDraft[]
 }
 
 const NotificationRuleCards: FunctionComponent<Props> = ({rules}) => {
   return (
-    <>
-      <ResourceList>
-        <ResourceList.Body emptyState={<EmptyNotificationRulesList />}>
-          {rules.map(nr => (
-            <NotificationRuleCard key={nr.id} rule={nr} />
-          ))}
-        </ResourceList.Body>
-      </ResourceList>
-    </>
+    <ResourceList>
+      <ResourceList.Body emptyState={<EmptyNotificationRulesList />}>
+        {rules.map(nr => (
+          <NotificationRuleCard key={nr.id} rule={nr} />
+        ))}
+      </ResourceList.Body>
+    </ResourceList>
   )
 }
 
 const EmptyNotificationRulesList: FunctionComponent = () => {
   return (
-    <EmptyState size={ComponentSize.ExtraSmall}>
+    <EmptyState size={ComponentSize.ExtraSmall} className="alert-column--empty">
       <EmptyState.Text
-        text="Looks like you don’t have any Notification Rules, why not create one?"
-        highlightWords={['Notification Rules']}
+        text="Looks like you don’t have any Notification  Rules , why not create one?"
+        highlightWords={['Notification', 'Rules']}
       />
     </EmptyState>
   )
