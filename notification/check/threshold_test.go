@@ -9,22 +9,11 @@ import (
 	"github.com/influxdata/influxdb/notification/check"
 )
 
-// "github.com/davecgh/go-spew/spew"
-// "github.com/influxdata/flux/parser"
-
 func GenerateAST(t check.Threshold) *ast.File {
 	return &ast.File{
 		Name:    "threshold.flux",
-		Imports: []*ast.ImportDeclaration{ImportStatement()},
+		Imports: Imports("influxdata/influxdb/alerts"),
 		Body:    GenerateBody(t),
-	}
-}
-
-func ImportStatement() *ast.ImportDeclaration {
-	return &ast.ImportDeclaration{
-		Path: &ast.StringLiteral{
-			Value: "influxdata/influxdb/alerts",
-		},
 	}
 }
 
@@ -33,8 +22,20 @@ func GenerateBody(t check.Threshold) []ast.Statement {
 	statements = append(statements, CheckDefinition(t))
 	statements = append(statements, ThresholdFunctions(t.Thresholds)...)
 	statements = append(statements, MessageFunction(t.StatusMessageTemplate))
-	statements = append(statements, ChecksFunction(t))
+	statements = append(statements, ChecksFunction())
 	return statements
+}
+
+func CheckDefinition(t check.Threshold) ast.Statement {
+	tagProperties := []*ast.Property{}
+	for _, tag := range t.Tags {
+		tagProperties = append(tagProperties, Property(tag.Key, String(tag.Value)))
+	}
+	tags := Property("tags", Object(tagProperties...))
+
+	checkID := Property("checkID", String(t.ID.String()))
+
+	return DefineVariable("check", Object(checkID, tags))
 }
 
 func ThresholdFunctions(cs []check.ThresholdConfig) []ast.Statement {
@@ -51,6 +52,10 @@ func ThresholdFunctions(cs []check.ThresholdConfig) []ast.Statement {
 		//need without range here
 	}
 	return thresholdStatements
+}
+func MessageFunction(m string) ast.Statement {
+	fn := Function(FunctionParams("r", "check"), String(m))
+	return DefineVariable("messageFn", fn)
 }
 
 func GreaterThresholdFunction(c check.ThresholdConfig) ast.Statement {
@@ -114,57 +119,47 @@ func RangeThresholdFunction(c check.ThresholdConfig) ast.Statement {
 	return DefineVariable(lvl, fn)
 }
 
-func MessageFunction(m string) ast.Statement {
-	fn := Function(FunctionParams("r", "check"), String(m))
-	return DefineVariable("messageFn", fn)
+func ChecksFunction() *ast.ExpressionStatement {
+	return ExpressionStatement(Pipe(Identifier("data"), ChecksCall()))
 }
 
-func ChecksFunction(t check.Threshold) *ast.ExpressionStatement {
-	var body ast.Expression = &ast.Identifier{Name: "data"}
+func Pipe(base ast.Expression, calls ...*ast.CallExpression) *ast.PipeExpression {
+	if len(calls) < 1 {
+		panic("must pipe forward to at least one *ast.CallExpression")
+	}
+	pe := appendPipe(base, calls[0])
+	for _, call := range calls[1:] {
+		pe = appendPipe(pe, call)
+	}
 
-	body = AppendPipe(body, ChecksCall(t))
-
-	return &ast.ExpressionStatement{Expression: body}
+	return pe
 }
 
-func AppendPipe(base ast.Expression, next *ast.CallExpression) *ast.PipeExpression {
+func appendPipe(base ast.Expression, next *ast.CallExpression) *ast.PipeExpression {
 	return &ast.PipeExpression{
 		Argument: base,
 		Call:     next,
 	}
 }
 
-func ChecksCall(t check.Threshold) *ast.CallExpression {
+func CallExpression(fn ast.Expression, args *ast.ObjectExpression) *ast.CallExpression {
 	return &ast.CallExpression{
-		Callee: &ast.MemberExpression{
-			Object:   &ast.Identifier{Name: "alerts"},
-			Property: &ast.Identifier{Name: "check"},
-		},
+		Callee: fn,
 		Arguments: []ast.Expression{
-			&ast.ObjectExpression{
-				Properties: []*ast.Property{
-					{
-						Key: &ast.Identifier{Name: "check"}, Value: &ast.Identifier{Name: "check"},
-					},
-					{
-						Key: &ast.Identifier{Name: "messageFn"}, Value: &ast.Identifier{Name: "messageFn"},
-					},
-					{
-						Key: &ast.Identifier{Name: "ok"}, Value: &ast.Identifier{Name: "ok"},
-					},
-					{
-						Key: &ast.Identifier{Name: "info"}, Value: &ast.Identifier{Name: "info"},
-					},
-					{
-						Key: &ast.Identifier{Name: "warn"}, Value: &ast.Identifier{Name: "warn"},
-					},
-					{
-						Key: &ast.Identifier{Name: "crit"}, Value: &ast.Identifier{Name: "crit"},
-					},
-				},
-			},
+			args,
 		},
 	}
+}
+
+func ChecksCall() *ast.CallExpression {
+	objectProps := append(([]*ast.Property)(nil), Property("check", Identifier("check")))
+	objectProps = append(objectProps, Property("messageFn", Identifier("messageFn")))
+	objectProps = append(objectProps, Property("ok", Identifier("ok")))
+	objectProps = append(objectProps, Property("info", Identifier("info")))
+	objectProps = append(objectProps, Property("warn", Identifier("warn")))
+	objectProps = append(objectProps, Property("crit", Identifier("crit")))
+
+	return CallExpression(Member("alerts", "check"), Object(objectProps...))
 }
 
 func ObjectPropertyString(key, value string) *ast.Property {
@@ -194,6 +189,14 @@ func String(s string) *ast.StringLiteral {
 	}
 }
 
+func Identifier(i string) *ast.Identifier {
+	return &ast.Identifier{Name: i}
+}
+
+func ExpressionStatement(e ast.Expression) *ast.ExpressionStatement {
+	return &ast.ExpressionStatement{Expression: e}
+}
+
 func Float(f float64) *ast.FloatLiteral {
 	return &ast.FloatLiteral{
 		Value: f,
@@ -213,17 +216,6 @@ func FunctionParams(args ...string) []*ast.Property {
 		params = append(params, &ast.Property{Key: &ast.Identifier{Name: arg}})
 	}
 	return params
-}
-
-func CheckDefinition(t check.Threshold) ast.Statement {
-	tagProperties := []*ast.Property{}
-	for _, tag := range t.Tags {
-		tagProperties = append(tagProperties, Property(tag.Key, String(tag.Value)))
-	}
-	tags := Property("tags", Object(tagProperties...))
-	checkID := Property("checkID", String(t.ID.String()))
-
-	return DefineVariable("check", Object(checkID, tags))
 }
 
 func DefineVariable(id string, e ast.Expression) *ast.VariableAssignment {
@@ -247,6 +239,22 @@ func Property(key string, e ast.Expression) *ast.Property {
 func Object(ps ...*ast.Property) *ast.ObjectExpression {
 	return &ast.ObjectExpression{
 		Properties: ps,
+	}
+}
+
+func Imports(pkgs ...string) []*ast.ImportDeclaration {
+	var is []*ast.ImportDeclaration
+	for _, pkg := range pkgs {
+		is = append(is, ImportDeclaration(pkg))
+	}
+	return is
+}
+
+func ImportDeclaration(pkg string) *ast.ImportDeclaration {
+	return &ast.ImportDeclaration{
+		Path: &ast.StringLiteral{
+			Value: "influxdata/influxdb/alerts",
+		},
 	}
 }
 
