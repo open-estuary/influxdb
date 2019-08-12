@@ -53,6 +53,7 @@ func ThresholdFunctions(cs []check.ThresholdConfig) []ast.Statement {
 	}
 	return thresholdStatements
 }
+
 func MessageFunction(m string) ast.Statement {
 	fn := Function(FunctionParams("r", "check"), String(m))
 	return DefineVariable("messageFn", fn)
@@ -65,6 +66,42 @@ func GreaterThresholdFunction(c check.ThresholdConfig) ast.Statement {
 	fn := Function(FunctionParams("r"), fnBody)
 
 	return DefineVariable(lvl, fn)
+}
+
+func LesserThresholdFunction(c check.ThresholdConfig) ast.Statement {
+	fnBody := LessThan(Member("r", "_value"), Float(*c.UpperBound))
+	fn := Function(FunctionParams("r"), fnBody)
+
+	lvl := strings.ToLower(c.Level.String())
+
+	return DefineVariable(lvl, fn)
+}
+
+func RangeThresholdFunction(c check.ThresholdConfig) ast.Statement {
+	fnBody := And(
+		LessThan(Member("r", "_value"), Float(*c.UpperBound)),
+		GreaterThan(Member("r", "_value"), Float(*c.LowerBound)),
+	)
+	fn := Function(FunctionParams("r"), fnBody)
+
+	lvl := strings.ToLower(c.Level.String())
+
+	return DefineVariable(lvl, fn)
+}
+
+func ChecksFunction() *ast.ExpressionStatement {
+	return ExpressionStatement(Pipe(Identifier("data"), ChecksCall()))
+}
+
+func ChecksCall() *ast.CallExpression {
+	objectProps := append(([]*ast.Property)(nil), Property("check", Identifier("check")))
+	objectProps = append(objectProps, Property("messageFn", Identifier("messageFn")))
+	objectProps = append(objectProps, Property("ok", Identifier("ok")))
+	objectProps = append(objectProps, Property("info", Identifier("info")))
+	objectProps = append(objectProps, Property("warn", Identifier("warn")))
+	objectProps = append(objectProps, Property("crit", Identifier("crit")))
+
+	return CallExpression(Member("alerts", "check"), Object(objectProps...))
 }
 
 func GreaterThan(lhs, rhs ast.Expression) ast.Expression {
@@ -90,37 +127,12 @@ func Member(p, c string) *ast.MemberExpression {
 	}
 }
 
-func LesserThresholdFunction(c check.ThresholdConfig) ast.Statement {
-	fnBody := LessThan(Member("r", "_value"), Float(*c.UpperBound))
-	fn := Function(FunctionParams("r"), fnBody)
-
-	lvl := strings.ToLower(c.Level.String())
-
-	return DefineVariable(lvl, fn)
-}
-
 func And(lhs, rhs ast.Expression) ast.Expression {
 	return &ast.LogicalExpression{
 		Operator: ast.AndOperator,
 		Left:     lhs,
 		Right:    rhs,
 	}
-}
-
-func RangeThresholdFunction(c check.ThresholdConfig) ast.Statement {
-	fnBody := And(
-		LessThan(Member("r", "_value"), Float(*c.UpperBound)),
-		GreaterThan(Member("r", "_value"), Float(*c.LowerBound)),
-	)
-	fn := Function(FunctionParams("r"), fnBody)
-
-	lvl := strings.ToLower(c.Level.String())
-
-	return DefineVariable(lvl, fn)
-}
-
-func ChecksFunction() *ast.ExpressionStatement {
-	return ExpressionStatement(Pipe(Identifier("data"), ChecksCall()))
 }
 
 func Pipe(base ast.Expression, calls ...*ast.CallExpression) *ast.PipeExpression {
@@ -148,38 +160,6 @@ func CallExpression(fn ast.Expression, args *ast.ObjectExpression) *ast.CallExpr
 		Arguments: []ast.Expression{
 			args,
 		},
-	}
-}
-
-func ChecksCall() *ast.CallExpression {
-	objectProps := append(([]*ast.Property)(nil), Property("check", Identifier("check")))
-	objectProps = append(objectProps, Property("messageFn", Identifier("messageFn")))
-	objectProps = append(objectProps, Property("ok", Identifier("ok")))
-	objectProps = append(objectProps, Property("info", Identifier("info")))
-	objectProps = append(objectProps, Property("warn", Identifier("warn")))
-	objectProps = append(objectProps, Property("crit", Identifier("crit")))
-
-	return CallExpression(Member("alerts", "check"), Object(objectProps...))
-}
-
-func ObjectPropertyString(key, value string) *ast.Property {
-	return &ast.Property{
-		Key:   &ast.Identifier{Name: key},
-		Value: &ast.StringLiteral{Value: value},
-	}
-}
-
-func ObjectPropertyTags(tags []notification.Tag) *ast.Property {
-
-	values := []*ast.Property{}
-
-	for _, t := range tags {
-		values = append(values, &ast.Property{Key: &ast.Identifier{Name: t.Key}, Value: &ast.StringLiteral{Value: t.Value}})
-	}
-
-	return &ast.Property{
-		Key:   &ast.Identifier{Name: "tags"},
-		Value: &ast.ObjectExpression{Properties: values},
 	}
 }
 
@@ -290,92 +270,4 @@ func TestThreshold_FluxAST(t *testing.T) {
 	}
 
 	t.Error(ast.Format(GenerateAST(threshold)))
-	// t.Error(spew.Sdump(GreaterThanEqualTo(10)))
-	// spewString := `data |> alerts.check(check: check, info:info, crit:crit)`
-	// t.Error(spew.Sdump(parser.ParseSource(spewString)))
 }
-
-// data = from(bucket: "defbuck") |> range(start: -5m) |> aggregateWindow(period: 1m, fn: count)
-//
-
-// Example 1
-// {
-//  ...
-//  "name": "defcheck",
-//  "tags": [{"defkey": "defvalue"}]
-//  "threshold": [
-//   {
-//    "type": "greater",
-//    "allValues": false,
-//    "level": "info",
-//    "value": 10.0
-//   }
-//  }
-// }
-
-// import "influxdata/influxdb/alerts"
-//
-// info = (r) => r._value >= 10.0
-// sets = (tables=<-) => tables |> set(key: "checkID", value: "<id of check>") |> set(key: "defkey", value: "defvalue")
-// data |> sets() |> alerts.check( name: "defcheck", info: info)
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-// Example 2
-// {
-//  ...
-//  "name": "defcheck",
-//  "tags": [{"defkey": "defvalue"}]
-//  "threshold": [
-//   {
-//    "type": "range",
-//    "allValues": false,
-//    "level": "info",
-//    "upperBound": 10.0
-//    "lowerBound": 1.0
-//   }
-//  }
-// }
-
-// import "influxdata/influxdb/alerts"
-//
-// info = (r) => r._value <= 10.0 and r._value >= 1.0
-// sets = (tables=<-) => tables |> set(key: "checkID", value: "<id of check>") |> set(key: "defkey", value: "defvalue")
-// data |> sets() |> alerts.check( name: "defcheck", info: info)
-//
-// data |> alerts.check(check: check, info:info, crit:crit)
-
-//  { ..., _level: "info", _name: "defcheck" }
-//  { ..., _level: "info", _name: "defcheck" }
-//  { ..., _level: "info", _name: "defcheck" }
-//  { ..., _level: "info", _name: "defcheck" }
-//  { ..., _level: "info", _name: "defcheck" }
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-// Example 3
-// {
-//  ...
-
-// check  = {
-//   name: "asdfn",
-//   id: "chgeckID",
-//   tags: ...
-// }
-//  "name": "defcheck",
-//  "tags": [{"defkey": "defvalue"}]
-//  "threshold": [
-//   {
-//    "type": "greater",
-//    "allValues": false,
-//    "level": "info",
-//    "value": 10.0
-//   }
-//  }
-// }
-
-// import "influxdata/influxdb/alerts"
-//
-// info = (r) => r._value >= 10.0
-// sets = (tables=<-) => tables |> set(key: "checkID", value: "<id of check>") |> set(key: "defkey", value: "defvalue")
-// data |> sets() |> alerts.check( name: "defcheck", info: info)
