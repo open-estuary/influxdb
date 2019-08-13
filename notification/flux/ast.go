@@ -1,8 +1,6 @@
-package check
+package flux
 
-import (
-	"github.com/influxdata/flux/ast"
-)
+import "github.com/influxdata/flux/ast"
 
 func File(name string, imports []*ast.ImportDeclaration, body []ast.Statement) *ast.File {
 	return &ast.File{
