@@ -52,24 +52,32 @@ func multiError(errs []error) error {
 // are any errors in the flux that the user provided the function will return
 // an error for each error found when the script is parsed.
 func (t Threshold) GenerateFlux() (string, error) {
-	p := parser.ParseSource(t.Query.Text)
-
-	if errs := ast.GetErrors(p); len(errs) != 0 {
-		return "", multiError(errs)
+	p, err := t.GenerateFluxAST()
+	if err != nil {
+		return "", err
 	}
-
-	f := t.GenerateFluxAST()
-	p.Files = append(p.Files, f)
 
 	return ast.Format(p), nil
 }
 
-func (t Threshold) GenerateFluxAST() *ast.File {
-	return flux.File(
+// GenerateFlux returns a flux AST for the threshold provided. If there
+// are any errors in the flux that the user provided the function will return
+// an error for each error found when the script is parsed.
+func (t Threshold) GenerateFluxAST() (*ast.Package, error) {
+	p := parser.ParseSource(t.Query.Text)
+
+	if errs := ast.GetErrors(p); len(errs) != 0 {
+		return nil, multiError(errs)
+	}
+
+	f := flux.File(
 		"threshold.flux",
 		flux.Imports("influxdata/influxdb/alerts"),
 		t.generateFluxASTBody(),
 	)
+	p.Files = append(p.Files, f)
+
+	return p, nil
 }
 
 func (t Threshold) generateFluxASTBody() []ast.Statement {
