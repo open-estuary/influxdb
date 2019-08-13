@@ -106,7 +106,7 @@ func (t Threshold) generateFluxASTChecksCall() *ast.CallExpression {
 	objectProps = append(objectProps, flux.Property("warn", flux.Identifier("warn")))
 	objectProps = append(objectProps, flux.Property("crit", flux.Identifier("crit")))
 
-	return flux.CallExpression(flux.Member("alerts", "check"), flux.Object(objectProps...))
+	return flux.Call(flux.Member("alerts", "check"), flux.Object(objectProps...))
 }
 
 func (t Threshold) generateFluxASTCheckDefinition() ast.Statement {
