@@ -101,10 +101,12 @@ func (t Threshold) generateFluxASTChecksFunction() ast.Statement {
 func (t Threshold) generateFluxASTChecksCall() *ast.CallExpression {
 	objectProps := append(([]*ast.Property)(nil), flux.Property("check", flux.Identifier("check")))
 	objectProps = append(objectProps, flux.Property("messageFn", flux.Identifier("messageFn")))
-	objectProps = append(objectProps, flux.Property("ok", flux.Identifier("ok")))
-	objectProps = append(objectProps, flux.Property("info", flux.Identifier("info")))
-	objectProps = append(objectProps, flux.Property("warn", flux.Identifier("warn")))
-	objectProps = append(objectProps, flux.Property("crit", flux.Identifier("crit")))
+
+	// This assumes that the ThresholdConfigs we've been provided do not have duplicates.
+	for _, c := range t.Thresholds {
+		lvl := strings.ToLower(c.Level.String())
+		objectProps = append(objectProps, flux.Property(lvl, flux.Identifier(lvl)))
+	}
 
 	return flux.Call(flux.Member("alerts", "check"), flux.Object(objectProps...))
 }
@@ -124,6 +126,7 @@ func (t Threshold) generateFluxASTCheckDefinition() ast.Statement {
 func (t Threshold) generateFluxASTThresholdFunctions() []ast.Statement {
 	thresholdStatements := []ast.Statement{}
 
+	// This assumes that the ThresholdConfigs we've been provided do not have duplicates.
 	for _, c := range t.Thresholds {
 		if c.UpperBound == nil {
 			thresholdStatements = append(thresholdStatements, c.generateFluxASTGreaterThresholdFunction())
