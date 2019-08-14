@@ -15,6 +15,7 @@ const (
 type Check interface {
 	Valid() error
 	Type() string
+	ClearPrivateData()
 	json.Marshaler
 	Updator
 	Getter

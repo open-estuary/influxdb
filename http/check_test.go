@@ -69,6 +69,7 @@ func TestService_handleGetChecks(t *testing.T) {
 									Name:   "hello",
 									OrgID:  influxTesting.MustIDBase16("50f7ba1150f7ba11"),
 									Status: influxdb.Active,
+									TaskID: 3,
 								},
 								Level: notification.Info,
 							},
@@ -78,6 +79,7 @@ func TestService_handleGetChecks(t *testing.T) {
 									Name:   "example",
 									OrgID:  influxTesting.MustIDBase16("7e55e118dbabb1ed"),
 									Status: influxdb.Inactive,
+									TaskID: 3,
 								},
 								Thresholds: []check.ThresholdConfig{
 									{LowerBound: &fl1},
@@ -323,6 +325,7 @@ func TestService_handleGetCheck(t *testing.T) {
 									Name:   "hello",
 									Status: influxdb.Active,
 									Every:  mustDuration("3h"),
+									TaskID: 3,
 								},
 								Level: notification.Critical,
 							}, nil
@@ -487,6 +490,7 @@ func TestService_handlePostCheck(t *testing.T) {
 						StatusMessageTemplate: "msg1",
 						Status:                influxdb.Active,
 						Every:                 mustDuration("5m"),
+						TaskID:                3,
 						Tags: []notification.Tag{
 							{Key: "k1", Value: "v1"},
 							{Key: "k2", Value: "v2"},
@@ -721,9 +725,10 @@ func TestService_handlePatchCheck(t *testing.T) {
 						if id == influxTesting.MustIDBase16("020f755c3c082000") {
 							d := &check.Deadman{
 								Base: check.Base{
-									ID:    influxTesting.MustIDBase16("020f755c3c082000"),
-									Name:  "hello",
-									OrgID: influxTesting.MustIDBase16("020f755c3c082000"),
+									ID:     influxTesting.MustIDBase16("020f755c3c082000"),
+									Name:   "hello",
+									OrgID:  influxTesting.MustIDBase16("020f755c3c082000"),
+									TaskID: 3,
 								},
 								Level: notification.Critical,
 							}
@@ -892,6 +897,7 @@ func TestService_handleUpdateCheck(t *testing.T) {
 									Name:   "hello",
 									Status: influxdb.Inactive,
 									OrgID:  influxTesting.MustIDBase16("020f755c3c082000"),
+									TaskID: 3,
 								},
 							}
 
@@ -912,6 +918,7 @@ func TestService_handleUpdateCheck(t *testing.T) {
 					Base: check.Base{
 						Name:   "example",
 						Status: influxdb.Active,
+						TaskID: 3,
 					},
 					Level: notification.Critical,
 				},

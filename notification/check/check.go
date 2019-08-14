@@ -23,6 +23,9 @@ type Base struct {
 	Query                 influxdb.DashboardQuery `json:"query"`
 	StatusMessageTemplate string                  `json:"statusMessageTemplate"`
 
+	// Care should be taken to prevent TaskID from being exposed publicly.
+	TaskID influxdb.ID `json:"taskID,omitempty"`
+
 	Cron  string    `json:"cron,omitempty"`
 	Every *Duration `json:"every,omitempty"`
 	// Offset represents a delay before execution.
@@ -140,6 +143,11 @@ func (b *Base) SetID(id influxdb.ID) {
 // SetOrgID will set the org key.
 func (b *Base) SetOrgID(id influxdb.ID) {
 	b.OrgID = id
+}
+
+// ClearPrivateData remove any data that we don't want to be exposed publicly.
+func (b *Base) ClearPrivateData() {
+	b.TaskID = 0
 }
 
 // SetName implements influxdb.Updator interface.
