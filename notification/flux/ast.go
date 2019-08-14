@@ -119,6 +119,13 @@ func DefineVariable(id string, e ast.Expression) *ast.VariableAssignment {
 	}
 }
 
+// DefineTaskOption returns an *ast.OptionStatement with the object provided. (e.g. option task = {...})
+func DefineTaskOption(o *ast.ObjectExpression) *ast.OptionStatement {
+	return &ast.OptionStatement{
+		Assignment: DefineVariable("task", o),
+	}
+}
+
 // Property returns an *ast.Property of key to e. (e.g. key: <expression>)
 func Property(key string, e ast.Expression) *ast.Property {
 	return &ast.Property{
