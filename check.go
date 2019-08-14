@@ -17,6 +17,7 @@ type Check interface {
 	Type() string
 	ClearPrivateData()
 	SetTaskID(ID)
+	GetTaskID() ID
 	GenerateFlux() (string, error)
 	GetAuthID() ID
 	json.Marshaler

@@ -575,7 +575,16 @@ func (s *Service) updateCheck(ctx context.Context, tx Tx, id influxdb.ID, chk in
 		}
 	}
 
+	if err := s.deleteTask(ctx, tx, chk.GetTaskID()); err != nil {
+		return nil, err
+	}
+	t, err := s.createCheckTask(ctx, tx, chk)
+	if err != nil {
+		return nil, err
+	}
+
 	// ID and OrganizationID can not be updated
+	chk.SetTaskID(t.ID)
 	chk.SetID(current.GetID())
 	chk.SetOrgID(current.GetOrgID())
 	chk.SetCreatedAt(current.GetCRUDLog().CreatedAt)
@@ -689,6 +698,10 @@ func (s *Service) deleteCheck(ctx context.Context, tx Tx, id influxdb.ID) error 
 	c, pe := s.findCheckByID(ctx, tx, id)
 	if pe != nil {
 		return pe
+	}
+
+	if err := s.deleteTask(ctx, tx, c.GetTaskID()); err != nil {
+		return err
 	}
 
 	key, pe := checkIndexKey(c.GetOrgID(), c.GetName())

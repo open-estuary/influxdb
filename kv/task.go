@@ -750,9 +750,13 @@ func (s *Service) deleteTask(ctx context.Context, tx Tx, id influxdb.ID) error {
 		return influxdb.ErrUnexpectedTaskBucketErr(err)
 	}
 
-	return s.deleteUserResourceMapping(ctx, tx, influxdb.UserResourceMappingFilter{
+	if err := s.deleteUserResourceMapping(ctx, tx, influxdb.UserResourceMappingFilter{
 		ResourceID: task.ID,
-	})
+	}); err != nil {
+		s.Logger.Info("error deleting user resource mapping for task", zap.Stringer("taskID", task.ID), zap.Error(err))
+	}
+
+	return nil
 }
 
 // FindLogs returns logs for a run.

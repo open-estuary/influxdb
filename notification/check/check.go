@@ -115,6 +115,11 @@ func (b Base) GetOrgID() influxdb.ID {
 	return b.OrgID
 }
 
+// GetTaskID retrieves the task ID for a check.
+func (b Base) GetTaskID() influxdb.ID {
+	return b.TaskID
+}
+
 // GetCRUDLog implements influxdb.Getter interface.
 func (b Base) GetCRUDLog() influxdb.CRUDLog {
 	return b.CRUDLog
