@@ -120,6 +120,11 @@ func (b Base) GetCRUDLog() influxdb.CRUDLog {
 	return b.CRUDLog
 }
 
+// GetAuthID gets the authID for a check
+func (b Base) GetAuthID() influxdb.ID {
+	return b.AuthorizationID
+}
+
 // GetName implements influxdb.Getter interface.
 func (b *Base) GetName() string {
 	return b.Name
@@ -148,6 +153,11 @@ func (b *Base) SetOrgID(id influxdb.ID) {
 // ClearPrivateData remove any data that we don't want to be exposed publicly.
 func (b *Base) ClearPrivateData() {
 	b.TaskID = 0
+}
+
+// SetTaskID sets the taskID for a check.
+func (b *Base) SetTaskID(id influxdb.ID) {
+	b.TaskID = id
 }
 
 // SetName implements influxdb.Updator interface.

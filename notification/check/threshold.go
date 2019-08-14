@@ -77,10 +77,16 @@ func (t Threshold) GenerateFluxAST() (*ast.Package, error) {
 	}
 
 	f := p.Files[0]
-	f.Imports = append(f.Imports, flux.Imports("influxdata/influxdb/alerts")...)
-	f.Body = append(f.Body, t.generateFluxASTBody()...)
+	f.Body = append(f.Body, t.generateTaskOption())
 
 	return p, nil
+
+	// TODO(desa): when the alerts package has been implemented we'll need to uncomment the code below
+	//
+	//	f.Imports = append(f.Imports, flux.Imports("influxdata/influxdb/alerts")...)
+	//	f.Body = append(f.Body, t.generateFluxASTBody()...)
+	//
+	//	return p, nil
 }
 
 func (t Threshold) generateTaskOption() ast.Statement {
@@ -105,7 +111,6 @@ func (t Threshold) generateTaskOption() ast.Statement {
 
 func (t Threshold) generateFluxASTBody() []ast.Statement {
 	var statements []ast.Statement
-	statements = append(statements, t.generateTaskOption())
 	statements = append(statements, t.generateFluxASTCheckDefinition())
 	statements = append(statements, t.generateFluxASTThresholdFunctions()...)
 	statements = append(statements, t.generateFluxASTMessageFunction())

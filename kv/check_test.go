@@ -55,6 +55,11 @@ func initCheckService(s kv.Store, f influxdbtesting.CheckFields, t *testing.T) (
 	if err := svc.Initialize(ctx); err != nil {
 		t.Fatalf("error initializing check service: %v", err)
 	}
+	for _, a := range f.Authorizations {
+		if err := svc.PutAuthorization(ctx, a); err != nil {
+			t.Fatalf("failed to populate auths: %v", err)
+		}
+	}
 	for _, m := range f.UserResourceMappings {
 		if err := svc.CreateUserResourceMapping(ctx, m); err != nil {
 			t.Fatalf("failed to populate user resource mapping: %v", err)

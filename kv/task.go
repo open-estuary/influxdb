@@ -10,6 +10,7 @@ import (
 	icontext "github.com/influxdata/influxdb/context"
 	"github.com/influxdata/influxdb/task/backend"
 	"github.com/influxdata/influxdb/task/options"
+	"go.uber.org/zap"
 	cron "gopkg.in/robfig/cron.v2"
 )
 
@@ -469,20 +470,13 @@ func (s *Service) CreateTask(ctx context.Context, tc influxdb.TaskCreate) (*infl
 }
 
 func (s *Service) createTask(ctx context.Context, tx Tx, tc influxdb.TaskCreate) (*influxdb.Task, error) {
-	userAuth, err := icontext.GetAuthorizer(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	if tc.Token == "" {
 		return nil, influxdb.ErrMissingToken
 	}
 
 	auth, err := s.findAuthorizationByToken(ctx, tx, tc.Token)
 	if err != nil {
-		if err.Error() != "<not found> authorization not found" {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	var org *influxdb.Organization
@@ -566,16 +560,26 @@ func (s *Service) createTask(ctx context.Context, tx Tx, tc influxdb.TaskCreate)
 	if err != nil {
 		return nil, influxdb.ErrUnexpectedTaskBucketErr(err)
 	}
-	if err := s.createUserResourceMapping(ctx, tx, &influxdb.UserResourceMapping{
-		ResourceType: influxdb.TasksResourceType,
-		ResourceID:   task.ID,
-		UserID:       userAuth.GetUserID(),
-		UserType:     influxdb.Owner,
-	}); err != nil {
-		return nil, err
+
+	if err := s.createTaskURM(ctx, tx, task); err != nil {
+		s.Logger.Info("error creating user resource mapping for task", zap.Stringer("taskID", task.ID), zap.Error(err))
 	}
 
 	return task, nil
+}
+
+func (s *Service) createTaskURM(ctx context.Context, tx Tx, t *influxdb.Task) error {
+	userAuth, err := icontext.GetAuthorizer(ctx)
+	if err != nil {
+		return err
+	}
+
+	return s.createUserResourceMapping(ctx, tx, &influxdb.UserResourceMapping{
+		ResourceType: influxdb.TasksResourceType,
+		ResourceID:   t.ID,
+		UserID:       userAuth.GetUserID(),
+		UserType:     influxdb.Owner,
+	})
 }
 
 // UpdateTask updates a single task with changeset.

@@ -9,6 +9,7 @@ import (
 )
 
 func TestThreshold_GenerateFlux(t *testing.T) {
+	t.Skip("while waiting for the alerts package to be ready we'll skip this test")
 	type args struct {
 		threshold check.Threshold
 	}
