@@ -70,12 +70,15 @@ func (t Threshold) GenerateFluxAST() (*ast.Package, error) {
 		return nil, multiError(errs)
 	}
 
-	f := flux.File(
-		"threshold.flux",
-		flux.Imports("influxdata/influxdb/alerts"),
-		t.generateFluxASTBody(),
-	)
-	p.Files = append(p.Files, f)
+	// TODO(desa): this is a hack that we had to do as a result of https://github.com/influxdata/flux/issues/1701
+	// when it is fixed we should use a separate file and not manipulate the existing one.
+	if len(p.Files) != 1 {
+		return nil, fmt.Errorf("expect a single file to be returned from query parsing got %d", len(p.Files))
+	}
+
+	f := p.Files[0]
+	f.Imports = append(f.Imports, flux.Imports("influxdata/influxdb/alerts")...)
+	f.Body = append(f.Body, t.generateFluxASTBody()...)
 
 	return p, nil
 }

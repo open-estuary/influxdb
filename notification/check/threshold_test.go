@@ -65,11 +65,10 @@ func TestThreshold_GenerateFlux(t *testing.T) {
 			},
 			wants: wants{
 				script: `package main
+import "influxdata/influxdb/alerts"
+
 data = from(bucket: "foo")
 	|> range(start: -1d)
-
-// threshold.flux
-import "influxdata/influxdb/alerts"
 
 option task = {name: "moo", every: 1h}
 
@@ -128,11 +127,10 @@ data
 			},
 			wants: wants{
 				script: `package main
+import "influxdata/influxdb/alerts"
+
 data = from(bucket: "foo")
 	|> range(start: -1d)
-
-// threshold.flux
-import "influxdata/influxdb/alerts"
 
 option task = {name: "moo", every: 1h, offset: 10m}
 
@@ -174,11 +172,10 @@ data
 			},
 			wants: wants{
 				script: `package main
+import "influxdata/influxdb/alerts"
+
 data = from(bucket: "foo")
 	|> range(start: -1d)
-
-// threshold.flux
-import "influxdata/influxdb/alerts"
 
 option task = {name: "moo"}
 
@@ -209,11 +206,10 @@ data
 			},
 			wants: wants{
 				script: `package main
+import "influxdata/influxdb/alerts"
+
 data = from(bucket: "foo")
 	|> range(start: -1d)
-
-// threshold.flux
-import "influxdata/influxdb/alerts"
 
 option task = {name: "moo", cron: "5 4 * * *"}
 
@@ -250,11 +246,10 @@ data
 			},
 			wants: wants{
 				script: `package main
+import "influxdata/influxdb/alerts"
+
 data = from(bucket: "foo")
 	|> range(start: -1d)
-
-// threshold.flux
-import "influxdata/influxdb/alerts"
 
 option task = {name: "foo"}
 
