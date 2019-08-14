@@ -80,13 +80,29 @@ func (t Threshold) GenerateFluxAST() (*ast.Package, error) {
 	f.Body = append(f.Body, t.generateTaskOption())
 
 	return p, nil
+}
 
-	// TODO(desa): when the alerts package has been implemented we'll need to uncomment the code below
-	//
-	//	f.Imports = append(f.Imports, flux.Imports("influxdata/influxdb/alerts")...)
-	//	f.Body = append(f.Body, t.generateFluxASTBody()...)
-	//
-	//	return p, nil
+// GenerateFluxASTReal is the real version of GenerateFluxAST. It has to exist so staticheck doesn't yell about
+// the unexported functions I have here.
+func (t Threshold) GenerateFluxASTReal() (*ast.Package, error) {
+	p := parser.ParseSource(t.Query.Text)
+
+	if errs := ast.GetErrors(p); len(errs) != 0 {
+		return nil, multiError(errs)
+	}
+
+	// TODO(desa): this is a hack that we had to do as a result of https://github.com/influxdata/flux/issues/1701
+	// when it is fixed we should use a separate file and not manipulate the existing one.
+	if len(p.Files) != 1 {
+		return nil, fmt.Errorf("expect a single file to be returned from query parsing got %d", len(p.Files))
+	}
+
+	f := p.Files[0]
+
+	f.Imports = append(f.Imports, flux.Imports("influxdata/influxdb/alerts")...)
+	f.Body = append(f.Body, t.generateFluxASTBody()...)
+
+	return p, nil
 }
 
 func (t Threshold) generateTaskOption() ast.Statement {
@@ -111,6 +127,7 @@ func (t Threshold) generateTaskOption() ast.Statement {
 
 func (t Threshold) generateFluxASTBody() []ast.Statement {
 	var statements []ast.Statement
+	statements = append(statements, t.generateTaskOption())
 	statements = append(statements, t.generateFluxASTCheckDefinition())
 	statements = append(statements, t.generateFluxASTThresholdFunctions()...)
 	statements = append(statements, t.generateFluxASTMessageFunction())

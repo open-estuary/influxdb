@@ -3,13 +3,13 @@ package check_test
 import (
 	"testing"
 
+	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/notification"
 	"github.com/influxdata/influxdb/notification/check"
 )
 
 func TestThreshold_GenerateFlux(t *testing.T) {
-	t.Skip("while waiting for the alerts package to be ready we'll skip this test")
 	type args struct {
 		threshold check.Threshold
 	}
@@ -273,12 +273,14 @@ data
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			script, err := tt.args.threshold.GenerateFlux()
+			// TODO(desa): change this to GenerateFlux() when we don't need to code
+			// around the alerts package not being available.
+			p, err := tt.args.threshold.GenerateFluxASTReal()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if exp, got := tt.wants.script, script; exp != got {
+			if exp, got := tt.wants.script, ast.Format(p); exp != got {
 				t.Errorf("expected:\n%v\n\ngot:\n%v\n", exp, got)
 			}
 		})
