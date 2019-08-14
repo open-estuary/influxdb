@@ -83,12 +83,19 @@ func (t Threshold) GenerateFluxAST() (*ast.Package, error) {
 func (t Threshold) generateTaskOption() ast.Statement {
 	props := []*ast.Property{}
 
+	props = append(props, flux.Property("name", flux.String(t.Name)))
+
 	if t.Cron != "" {
 		props = append(props, flux.Property("cron", flux.String(t.Cron)))
 	}
 
-	// TODO(desa): figure out how to get Every and Offset to work. The issue is that we have a influxdb.Duration and we want a *ast.Duration
-	//             we should use parse.ParseDuration for the type.
+	if t.Every != nil {
+		props = append(props, flux.Property("every", (*ast.DurationLiteral)(t.Every)))
+	}
+
+	if t.Offset != nil {
+		props = append(props, flux.Property("offset", (*ast.DurationLiteral)(t.Offset)))
+	}
 
 	return flux.DefineTaskOption(flux.Object(props...))
 }

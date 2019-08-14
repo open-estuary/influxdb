@@ -35,6 +35,7 @@ func TestThreshold_GenerateFlux(t *testing.T) {
 							{Key: "aaa", Value: "vaaa"},
 							{Key: "bbb", Value: "vbbb"},
 						},
+						Every:                 mustDuration("1h"),
 						StatusMessageTemplate: "whoa! {check.yeah}",
 						Query: influxdb.DashboardQuery{
 							Text: `data = from(bucket: "foo") |> range(start: -1d)`,
@@ -70,6 +71,8 @@ data = from(bucket: "foo")
 // threshold.flux
 import "influxdata/influxdb/alerts"
 
+option task = {name: "moo", every: 1h}
+
 check = {checkID: "000000000000000a", tags: {aaa: "vaaa", bbb: "vbbb"}}
 ok = (r) =>
 	(r._value > 10.0)
@@ -104,6 +107,8 @@ data
 							{Key: "aaa", Value: "vaaa"},
 							{Key: "bbb", Value: "vbbb"},
 						},
+						Every:                 mustDuration("1h"),
+						Offset:                mustDuration("10m"),
 						StatusMessageTemplate: "whoa! {check.yeah}",
 						Query: influxdb.DashboardQuery{
 							Text: `data = from(bucket: "foo") |> range(start: -1d)`,
@@ -128,6 +133,8 @@ data = from(bucket: "foo")
 
 // threshold.flux
 import "influxdata/influxdb/alerts"
+
+option task = {name: "moo", every: 1h, offset: 10m}
 
 check = {checkID: "000000000000000a", tags: {aaa: "vaaa", bbb: "vbbb"}}
 warn = (r) =>
@@ -173,6 +180,8 @@ data = from(bucket: "foo")
 // threshold.flux
 import "influxdata/influxdb/alerts"
 
+option task = {name: "moo"}
+
 check = {checkID: "000000000000000a", tags: {aaa: "vaaa", bbb: "vbbb"}}
 messageFn = (r, check) =>
 	("whoa! {check.yeah}")
@@ -188,6 +197,7 @@ data
 					Base: check.Base{
 						ID:                    10,
 						Name:                  "moo",
+						Cron:                  "5 4 * * *",
 						Tags:                  []notification.Tag{},
 						StatusMessageTemplate: "whoa! {check.yeah}",
 						Query: influxdb.DashboardQuery{
@@ -204,6 +214,8 @@ data = from(bucket: "foo")
 
 // threshold.flux
 import "influxdata/influxdb/alerts"
+
+option task = {name: "moo", cron: "5 4 * * *"}
 
 check = {checkID: "000000000000000a", tags: {}}
 messageFn = (r, check) =>
@@ -243,6 +255,8 @@ data = from(bucket: "foo")
 
 // threshold.flux
 import "influxdata/influxdb/alerts"
+
+option task = {name: "foo"}
 
 check = {checkID: "000000000000000a", tags: {
 	a: "b",
